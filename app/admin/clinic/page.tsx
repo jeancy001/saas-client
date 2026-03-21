@@ -1,4 +1,4 @@
-export function ClinicDashboard(){
+export default function ClinicDashboard(){
     return(
         <>
         Clinic  dashboard
