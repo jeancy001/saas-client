@@ -13,7 +13,7 @@ export default async function ClinicLayout({
   children,
   params,
 }: ClinicLayoutProps) {
-  // ✅ FIX: await params
+
   const { clinicId } = await params;
 
   let clinic: any = null;
@@ -37,19 +37,24 @@ export default async function ClinicLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50 overflow-x-hidden">
+
       <Navbar
         advertisement="Follow us"
         clinicEmail={clinic?.email ?? "clinic@gmail.com"}
         clinicPhone={clinic?.phone ?? "+243 4848940000"}
         logo={clinic?.logo ?? "/logo.png"}
         clinicName={clinic?.name ?? "Clinic"}
-        clinicId={clinicId} // ✅ still works
+        clinicId={clinicId}
       />
 
-      <main className="flex-1 px-6 py-8 mt-16">{children}</main>
+      {/* FULL WIDTH CONTENT */}
+      <main className="flex-1 w-full mt-16">
+        {children}
+      </main>
 
       <Footer />
+
     </div>
   );
 }
