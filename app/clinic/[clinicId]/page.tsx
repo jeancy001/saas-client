@@ -4,25 +4,42 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import AppointmentForm from "@/components/AppointementForm";
-import { Stethoscope, User, Activity } from "lucide-react";
+import {
+  Stethoscope,
+  User,
+  Activity,
+  HeartPulse,
+  ShieldCheck,
+  Clock,
+  Phone,
+  CalendarCheck,
+} from "lucide-react";
 
 /* ---------------- ANIMATIONS ---------------- */
 const fadeUp = { hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0 } };
-const stagger = { visible: { transition: { staggerChildren: 0.15 } } };
+const stagger = { visible: { transition: { staggerChildren: 0.12 } } };
 
-/* ---------------- HERO SECTION ---------------- */
+/* ---------------- HERO ---------------- */
 const HeroSection = ({ clinicName }: { clinicName: string }) => {
-  const images = ["/slides/nurse1.jpeg", "/slides/nurse2.jpeg", "/slides/nurse3.jpeg"];
+  const images = [
+    "/slides/nurse1.jpeg",
+    "/slides/nurse2.jpeg",
+    "/slides/nurse3.jpeg",
+  ];
+
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => setIndex((prev) => (prev + 1) % images.length), 4000);
-    return () => clearInterval(interval);
+    const i = setInterval(
+      () => setIndex((prev) => (prev + 1) % images.length),
+      5000
+    );
+    return () => clearInterval(i);
   }, []);
 
   return (
-    <div className="relative h-[80vh] flex items-center justify-center text-white overflow-hidden">
-      {/* Background Slider */}
+    <div className="relative h-[90vh] flex items-center justify-center text-white overflow-hidden">
+      {/* Background */}
       <AnimatePresence>
         <motion.div
           key={index}
@@ -33,7 +50,7 @@ const HeroSection = ({ clinicName }: { clinicName: string }) => {
           className="absolute inset-0"
         >
           <Image src={images[index]} alt="clinic" fill className="object-cover" priority />
-          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-blue-900/60" />
         </motion.div>
       </AnimatePresence>
 
@@ -42,85 +59,121 @@ const HeroSection = ({ clinicName }: { clinicName: string }) => {
         variants={stagger}
         initial="hidden"
         animate="visible"
-        className="relative z-10 text-center px-6"
+        className="relative z-10 text-center px-6 max-w-3xl"
       >
         <motion.h1
           variants={fadeUp}
-          className="text-5xl font-bold mb-4 drop-shadow-lg"
+          className="text-5xl md:text-6xl font-bold mb-6 leading-tight"
         >
           {clinicName}
         </motion.h1>
 
         <motion.p
           variants={fadeUp}
-          className="text-lg text-gray-200 max-w-xl mx-auto drop-shadow"
+          className="text-lg text-gray-200 mb-8"
         >
-          Excellence médicale, innovation et humanité au service de votre santé.
+          Soins médicaux de haute qualité, technologie moderne et expérience
+          patient premium à Kinshasa.
         </motion.p>
 
         <motion.div
           variants={fadeUp}
-          className="mt-8 flex flex-wrap justify-center gap-4"
+          className="flex flex-wrap justify-center gap-4"
         >
           <a
-            href="/clinic/appointments"
-            className="bg-white text-blue-700 px-6 py-3 rounded-xl font-semibold shadow-lg hover:scale-105 transition transform"
+            href="#appointment"
+            className="flex items-center gap-2 bg-white text-blue-700 px-6 py-3 rounded-xl font-semibold shadow-lg hover:scale-105 transition"
           >
+            <CalendarCheck size={18} />
             Rendez-vous
           </a>
+
           <a
             href="tel:+243000000000"
-            className="bg-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
+            className="flex items-center gap-2 bg-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
           >
+            <Phone size={18} />
             Appeler
           </a>
+        </motion.div>
+
+        {/* Stats */}
+        <motion.div
+          variants={fadeUp}
+          className="grid grid-cols-3 gap-6 mt-12 text-center"
+        >
+          {[
+            { value: "10+", label: "Médecins" },
+            { value: "5k+", label: "Patients" },
+            { value: "24/7", label: "Disponibilité" },
+          ].map((s, i) => (
+            <div key={i}>
+              <p className="text-2xl font-bold">{s.value}</p>
+              <p className="text-sm text-gray-300">{s.label}</p>
+            </div>
+          ))}
         </motion.div>
       </motion.div>
     </div>
   );
 };
 
-/* ---------------- WHY US SECTION ---------------- */
+/* ---------------- WHY US ---------------- */
 const WhyUsSection = () => (
   <motion.section
     variants={stagger}
     initial="hidden"
     whileInView="visible"
     viewport={{ once: true }}
-    className="max-w-7xl mx-auto px-6 py-20"
+    className="max-w-7xl mx-auto px-6 py-24"
   >
     <motion.h2
       variants={fadeUp}
-      className="text-3xl font-semibold text-center mb-14"
+      className="text-3xl font-semibold text-center mb-16"
     >
       Pourquoi nous choisir
     </motion.h2>
 
-    <div className="grid md:grid-cols-3 gap-8">
+    <div className="grid md:grid-cols-3 gap-10">
       {[
         {
-          icon: <Stethoscope size={32} />,
-          title: "Expertise",
-          desc: "Médecins hautement qualifiés dans plusieurs spécialités.",
+          icon: <Stethoscope />,
+          title: "Expertise médicale",
+          desc: "Professionnels certifiés avec plusieurs années d'expérience.",
         },
         {
-          icon: <Activity size={32} />,
-          title: "Technologie",
-          desc: "Équipements modernes pour un diagnostic précis.",
+          icon: <Activity />,
+          title: "Technologie avancée",
+          desc: "Équipements modernes pour diagnostics fiables.",
         },
         {
-          icon: <User size={32} />,
-          title: "Expérience patient",
-          desc: "Zéro attente et prise en charge premium.",
+          icon: <User />,
+          title: "Expérience premium",
+          desc: "Parcours patient fluide sans attente.",
+        },
+        {
+          icon: <HeartPulse />,
+          title: "Soins personnalisés",
+          desc: "Approche centrée sur chaque patient.",
+        },
+        {
+          icon: <ShieldCheck />,
+          title: "Sécurité",
+          desc: "Protocoles stricts et hygiène irréprochable.",
+        },
+        {
+          icon: <Clock />,
+          title: "Disponibilité",
+          desc: "Consultations rapides et urgences prises en charge.",
         },
       ].map((item, i) => (
         <motion.div
           key={i}
           variants={fadeUp}
-          whileHover={{ scale: 1.05 }}
-          className="bg-white p-8 rounded-2xl shadow-lg text-center"
+          whileHover={{ y: -6 }}
+          className="bg-white p-8 rounded-2xl shadow-md hover:shadow-xl transition"
         >
-          <div className="text-blue-600 mb-4 flex justify-center">{item.icon}</div>
+          <div className="text-blue-600 mb-4">{item.icon}</div>
           <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
           <p className="text-gray-600 text-sm">{item.desc}</p>
         </motion.div>
@@ -129,65 +182,91 @@ const WhyUsSection = () => (
   </motion.section>
 );
 
-/* ---------------- SPECIALTIES SECTION ---------------- */
+/* ---------------- SPECIALTIES ---------------- */
 const SpecialtiesSection = () => (
-  <motion.section
-    variants={stagger}
-    initial="hidden"
-    whileInView="visible"
-    viewport={{ once: true }}
-    className="bg-gray-100 py-20 px-6"
-  >
-    <motion.h2
-      variants={fadeUp}
-      className="text-3xl font-semibold text-center mb-14"
-    >
-      Nos Spécialités
-    </motion.h2>
+  <section className="bg-gray-100 py-24 px-6">
+    <div className="max-w-7xl mx-auto">
+      <h2 className="text-3xl font-semibold text-center mb-16">
+        Nos Spécialités
+      </h2>
 
-    <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
-      {["Gastro-entérologie", "Cardiologie", "Diabétologie"].map((item, i) => (
-        <motion.div
-          key={i}
-          variants={fadeUp}
-          whileHover={{ scale: 1.04 }}
-          className="bg-white p-6 rounded-2xl shadow-lg"
-        >
-          <h3 className="font-semibold text-blue-700 mb-3">{item}</h3>
-          <p className="text-gray-600 text-sm">
-            Soins spécialisés avec un haut niveau de précision et de sécurité.
-          </p>
-        </motion.div>
-      ))}
+      <div className="grid md:grid-cols-3 gap-10">
+        {[
+          "Cardiologie",
+          "Gastro-entérologie",
+          "Diabétologie",
+          "Pédiatrie",
+          "Dermatologie",
+          "Médecine générale",
+        ].map((item, i) => (
+          <motion.div
+            key={i}
+            whileHover={{ scale: 1.05 }}
+            className="relative h-56 rounded-2xl overflow-hidden shadow-lg group"
+          >
+            <Image
+              src="/slides/nurse2.jpeg"
+              alt="specialty"
+              fill
+              className="object-cover group-hover:scale-110 transition"
+            />
+
+            <div className="absolute inset-0 bg-black/50 flex items-end p-6">
+              <h3 className="text-white text-lg font-semibold">{item}</h3>
+            </div>
+          </motion.div>
+        ))}
+      </div>
     </div>
-  </motion.section>
+  </section>
 );
 
-/* ---------------- ABOUT SECTION ---------------- */
+/* ---------------- ABOUT ---------------- */
 const AboutSection = () => (
-  <motion.section
-    variants={stagger}
-    initial="hidden"
-    whileInView="visible"
-    viewport={{ once: true }}
-    className="max-w-7xl mx-auto px-6 py-20 grid md:grid-cols-2 gap-12 items-center"
-  >
-    <motion.div variants={fadeUp}>
-      <h2 className="text-3xl font-semibold mb-6">À propos</h2>
-      <p className="text-gray-600 mb-6">
-        Une clinique moderne centrée sur le patient, combinant expertise médicale et technologie avancée.
+  <section className="max-w-7xl mx-auto px-6 py-24 grid md:grid-cols-2 gap-16 items-center">
+    <div>
+      <h2 className="text-3xl font-semibold mb-6">À propos de la clinique</h2>
+      <p className="text-gray-600 mb-6 leading-relaxed">
+        Nous combinons expertise médicale, innovation technologique et
+        excellence du service pour offrir une prise en charge complète et
+        moderne.
       </p>
-    </motion.div>
 
-    <motion.div variants={fadeUp} className="relative h-80 rounded-2xl overflow-hidden shadow-xl">
+      <ul className="space-y-3 text-gray-600">
+        <li>✔ Équipe multidisciplinaire</li>
+        <li>✔ Équipements de pointe</li>
+        <li>✔ Suivi personnalisé</li>
+      </ul>
+    </div>
+
+    <div className="relative h-[400px] rounded-3xl overflow-hidden shadow-2xl">
       <Image src="/slides/nurse1.jpeg" alt="about" fill className="object-cover" />
-    </motion.div>
-  </motion.section>
+    </div>
+  </section>
 );
 
-/* ---------------- MAIN PAGE ---------------- */
+/* ---------------- CTA ---------------- */
+const CTASection = () => (
+  <section className="bg-blue-600 py-20 text-center text-white px-6">
+    <h2 className="text-3xl font-semibold mb-4">
+      Besoin d'une consultation rapide ?
+    </h2>
+    <p className="mb-6 text-blue-100">
+      Prenez rendez-vous en ligne en quelques secondes.
+    </p>
+    <a
+      href="#appointment"
+      className="bg-white text-blue-700 px-6 py-3 rounded-xl font-semibold hover:scale-105 transition inline-flex items-center gap-2"
+    >
+      <CalendarCheck size={18} />
+      Réserver maintenant
+    </a>
+  </section>
+);
+
+/* ---------------- MAIN ---------------- */
 export default function ClinicHomePage() {
-  const [clinic, setClinic] = useState({ name: "Nyota ya Asubuyi" });
+  const [clinic] = useState({ name: "Nyota ya Asubuyi" });
 
   return (
     <div className="bg-gray-50">
@@ -195,10 +274,15 @@ export default function ClinicHomePage() {
       <WhyUsSection />
       <SpecialtiesSection />
       <AboutSection />
+      <CTASection />
 
-      <section id="appointment" className="max-w-3xl mx-auto px-6 py-20">
-        <h2 className="text-3xl font-semibold text-center mb-8">Prendre Rendez-vous</h2>
-        <AppointmentForm clinicId="default" />
+      <section id="appointment" className="max-w-3xl mx-auto px-6 py-24">
+        <h2 className="text-3xl font-semibold text-center mb-10">
+          Prendre Rendez-vous
+        </h2>
+        <div className="bg-white p-8 rounded-2xl shadow-lg">
+          <AppointmentForm clinicId="default" />
+        </div>
       </section>
     </div>
   );

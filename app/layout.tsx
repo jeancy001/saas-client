@@ -12,8 +12,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// ---------------- METADATA ----------------
 export const metadata: Metadata = {
-  metadataBase: new URL("https://your-domain.com"),
+  metadataBase: new URL("https://nyota-clinic.vercel.app"),
 
   title: {
     default: "Nyota ya Asubuyi",
@@ -55,7 +56,7 @@ export const metadata: Metadata = {
     title: "Nyota ya Asubuyi",
     description:
       "Excellence médicale, innovation et humanité au service de votre santé.",
-    url: "https://your-domain.com",
+    url: "https://nyota-clinic.vercel.app",
     siteName: "Nyota ya Asubuyi",
     images: [
       {
@@ -82,15 +83,18 @@ export const metadata: Metadata = {
     follow: true,
   },
 
-  themeColor: "#0ea5e9",
   category: "healthcare",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// ---------------- VIEWPORT (includes themeColor) ----------------
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0ea5e9",
+};
+
+// ---------------- ROOT LAYOUT ----------------
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
       <body

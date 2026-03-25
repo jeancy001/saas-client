@@ -7,9 +7,14 @@ import {
   UserPlus,
   Calendar,
   FileText,
-  Layers,
+  Users,
+  Activity,
+  Clock,
+  Plus,
+  Search,
+  Bell,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import Image from "next/image";
 
 /* ---------------- TYPES ---------------- */
 
@@ -33,359 +38,221 @@ type Nurse = {
   availability: Availability[];
 };
 
-type SectionType = "hero" | "text" | "image";
-
-export type BlogSection = {
-  id: string;
-  type: SectionType;
-  title?: string;
-  content?: string;
-  image?: string;
-};
-
-type Blog = {
-  id: string;
-  title: string;
-  sections: BlogSection[];
-};
-
 type Person = Doctor | Nurse;
 
 /* ---------------- COMPONENT ---------------- */
 
 export default function ClinicDashboard() {
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "doctors" | "nurses" | "availability" | "blog"
+    "dashboard" | "doctors" | "availability"
   >("dashboard");
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [nurses, setNurses] = useState<Nurse[]>([]);
-  const [blogs, setBlogs] = useState<Blog[]>([]);
-  const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null);
 
-  /* ---------------- DOCTOR / NURSE ---------------- */
+  /* ---------------- LOGIC ---------------- */
 
   const addDoctor = () =>
     setDoctors((prev) => [
       ...prev,
       {
         id: crypto.randomUUID(),
-        name: "Doctor Name",
+        name: "Dr. Name",
         specialty: "General",
         availability: [],
       },
     ]);
 
-  const addNurse = () =>
-    setNurses((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        name: "Nurse Name",
-        department: "Emergency",
-        availability: [],
-      },
-    ]);
-
-  const addAvailability = (id: string, type: "doctor" | "nurse") => {
+  const addAvailability = (id: string) => {
     const slot: Availability = {
       day: "Monday",
       start: "08:00",
       end: "16:00",
     };
 
-    if (type === "doctor") {
-      setDoctors((prev) =>
-        prev.map((d) =>
-          d.id === id
-            ? { ...d, availability: [...d.availability, slot] }
-            : d
-        )
-      );
-    } else {
-      setNurses((prev) =>
-        prev.map((n) =>
-          n.id === id
-            ? { ...n, availability: [...n.availability, slot] }
-            : n
-        )
-      );
-    }
-  };
-
-  /* ---------------- BLOG ---------------- */
-
-  const addBlog = () => {
-    const blog: Blog = {
-      id: crypto.randomUUID(),
-      title: "New Article",
-      sections: [],
-    };
-    setBlogs((prev) => [blog, ...prev]);
-  };
-
-  const updateBlog = (updated: Blog) => {
-    setBlogs((prev) =>
-      prev.map((b) => (b.id === updated.id ? updated : b))
+    setDoctors((prev) =>
+      prev.map((d) =>
+        d.id === id
+          ? { ...d, availability: [...d.availability, slot] }
+          : d
+      )
     );
-    setSelectedBlog(updated);
-  };
-
-  const addSection = (type: SectionType) => {
-    if (!selectedBlog) return;
-
-    const section: BlogSection = {
-      id: crypto.randomUUID(),
-      type,
-      title: "",
-      content: "",
-    };
-
-    updateBlog({
-      ...selectedBlog,
-      sections: [...selectedBlog.sections, section],
-    });
   };
 
   /* ---------------- UI ---------------- */
 
   return (
-    <div className="flex min-h-screen bg-gray-100 mt-10">
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-white shadow-lg p-6 space-y-6">
-        <h1 className="text-2xl font-bold">Clinic Panel</h1>
+    <div className="min-h-screen bg-gray-50 flex mt-10 top-10 pt-10">
+      {/* SIDEBAR (STATIC) */}
+      <aside className="hidden lg:flex w-64 flex-col bg-white border-r p-6">
+        <div className="flex items-center gap-2 mb-10">
+          <Stethoscope className="text-blue-600" />
+          <h1 className="text-lg font-bold">ClinicCare</h1>
+        </div>
 
-        <nav className="space-y-2">
-          <NavItem icon={LayoutDashboard} label="Dashboard" onClick={() => setActiveTab("dashboard")} />
-          <NavItem icon={Stethoscope} label="Doctors" onClick={() => setActiveTab("doctors")} />
-          <NavItem icon={UserPlus} label="Nurses" onClick={() => setActiveTab("nurses")} />
-          <NavItem icon={Calendar} label="Availability" onClick={() => setActiveTab("availability")} />
-          <NavItem icon={FileText} label="Blog CMS" onClick={() => setActiveTab("blog")} />
+        <nav className="space-y-1">
+          <NavItem icon={LayoutDashboard} label="Dashboard" onClick={() => setActiveTab("dashboard")} active={activeTab === "dashboard"} />
+          <NavItem icon={Stethoscope} label="Doctors" onClick={() => setActiveTab("doctors")} active={activeTab === "doctors"} />
+          <NavItem icon={Calendar} label="Schedules" onClick={() => setActiveTab("availability")} active={activeTab === "availability"} />
         </nav>
       </aside>
 
       {/* MAIN */}
-      <main className="flex-1 p-8 space-y-6">
-        {/* DASHBOARD */}
-        {activeTab === "dashboard" && (
-          <motion.div className="grid grid-cols-3 gap-6">
-            <Stat title="Doctors" value={doctors.length} />
-            <Stat title="Nurses" value={nurses.length} />
-            <Stat title="Blogs" value={blogs.length} />
-          </motion.div>
-        )}
+      <div className="flex-1 flex flex-col">
+        {/* TOPBAR (NO FLOAT) */}
+        <header className="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8">
+          <h2 className="font-semibold capitalize">{activeTab}</h2>
 
-        {/* DOCTORS */}
-        {activeTab === "doctors" && (
-          <Section title="Doctors" action={{ label: "Add", onClick: addDoctor }}>
-            {doctors.map((d) => (
-              <Card key={d.id}>
-                <div>
-                  <input
-                    value={d.name}
-                    onChange={(e) =>
-                      setDoctors((prev) =>
-                        prev.map((doc) =>
-                          doc.id === d.id
-                            ? { ...doc, name: e.target.value }
-                            : doc
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    value={d.specialty}
-                    onChange={(e) =>
-                      setDoctors((prev) =>
-                        prev.map((doc) =>
-                          doc.id === d.id
-                            ? { ...doc, specialty: e.target.value }
-                            : doc
-                        )
-                      )
-                    }
-                  />
-                </div>
-
-                <button onClick={() => addAvailability(d.id, "doctor")}>
-                  + Slot
-                </button>
-              </Card>
-            ))}
-          </Section>
-        )}
-
-        {/* AVAILABILITY */}
-        {activeTab === "availability" && (
-          <Section title="Schedules">
-            <Grid>
-              {[...doctors, ...nurses].map((p: Person) => (
-                <Card key={p.id}>
-                  <div>
-                    <h3>{p.name}</h3>
-                    {p.availability.map((a, i) => (
-                      <p key={i}>
-                        {a.day} {a.start}-{a.end}
-                      </p>
-                    ))}
-                  </div>
-                </Card>
-              ))}
-            </Grid>
-          </Section>
-        )}
-
-        {/* BLOG */}
-        {activeTab === "blog" && (
-          <div className="grid grid-cols-3 gap-6">
-            <div>
-              <button onClick={addBlog}>+ Blog</button>
-
-              {blogs.map((b) => (
-                <div key={b.id} onClick={() => setSelectedBlog(b)}>
-                  {b.title}
-                </div>
-              ))}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+              <input
+                placeholder="Search..."
+                className="pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              />
             </div>
 
-            <div className="col-span-2 space-y-4">
-              {selectedBlog && (
-                <>
-                  <input
-                    value={selectedBlog.title}
-                    onChange={(e) =>
-                      updateBlog({ ...selectedBlog, title: e.target.value })
-                    }
-                  />
+            <button className="p-2 rounded-lg border hover:bg-gray-100">
+              <Bell size={18} />
+            </button>
+          </div>
+        </header>
 
-                  <div className="flex gap-2">
-                    <Btn onClick={() => addSection("hero")} label="Hero" />
-                    <Btn onClick={() => addSection("text")} label="Text" />
-                    <Btn onClick={() => addSection("image")} label="Image" />
-                  </div>
-
-                  {selectedBlog.sections.map((sec) => (
-                    <BlogSectionEditor
-                      key={sec.id}
-                      section={sec}
-                      onChange={(updated: BlogSection) => {
-                        updateBlog({
-                          ...selectedBlog,
-                          sections: selectedBlog.sections.map((s) =>
-                            s.id === sec.id ? updated : s
-                          ),
-                        });
-                      }}
-                    />
-                  ))}
-                </>
-              )}
+        {/* CONTENT */}
+        <main className="p-4 lg:p-8 space-y-6">
+          {/* HERO */}
+          <div className="relative h-36 lg:h-44 rounded-xl overflow-hidden">
+            <Image
+              src="/images/clinic-dashboard.jpg"
+              alt="clinic"
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-black/50 flex items-center px-6">
+              <h2 className="text-white text-lg lg:text-2xl font-bold">
+                Manage your clinic efficiently
+              </h2>
             </div>
           </div>
-        )}
-      </main>
-    </div>
-  );
-}
 
-/* ---------------- BLOG SECTION ---------------- */
+          {/* STATS */}
+          {activeTab === "dashboard" && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Stat title="Doctors" value={doctors.length} icon={Stethoscope} />
+              <Stat title="Nurses" value={nurses.length} icon={Users} />
+              <Stat title="Appointments" value={12} icon={Calendar} />
+              <Stat title="Activity" value={5} icon={Activity} />
+            </div>
+          )}
 
-type BlogSectionEditorProps = {
-  section: BlogSection;
-  onChange: (updated: BlogSection) => void;
-};
+          {/* DOCTORS */}
+          {activeTab === "doctors" && (
+            <Section title="Doctors" action={{ label: "Add Doctor", onClick: addDoctor }}>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {doctors.map((d) => (
+                  <Card key={d.id}>
+                    <input className="input" value={d.name} />
+                    <input className="input mt-2" value={d.specialty} />
 
-function BlogSectionEditor({ section, onChange }: BlogSectionEditorProps) {
-  return (
-    <div className="bg-white p-4 border rounded-xl space-y-2">
-      <div className="flex gap-2 text-sm text-gray-500">
-        <Layers size={14} /> {section.type}
+                    <button
+                      className="btn-secondary mt-2"
+                      onClick={() => addAvailability(d.id)}
+                    >
+                      <Plus size={14} /> Add Slot
+                    </button>
+                  </Card>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {/* AVAILABILITY */}
+          {activeTab === "availability" && (
+            <Section title="Schedules">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[...doctors, ...nurses].map((p: Person) => (
+                  <Card key={p.id}>
+                    <h3 className="font-semibold">{p.name}</h3>
+                    {p.availability.map((a, i) => (
+                      <p key={i} className="text-sm flex gap-2 text-gray-500">
+                        <Clock size={14} /> {a.day} {a.start}-{a.end}
+                      </p>
+                    ))}
+                  </Card>
+                ))}
+              </div>
+            </Section>
+          )}
+        </main>
       </div>
-
-      {(section.type === "hero" || section.type === "text") && (
-        <>
-          <input
-            value={section.title}
-            onChange={(e) =>
-              onChange({ ...section, title: e.target.value })
-            }
-          />
-          <textarea
-            value={section.content}
-            onChange={(e) =>
-              onChange({ ...section, content: e.target.value })
-            }
-          />
-        </>
-      )}
-
-      {section.type === "image" && (
-        <input
-          type="file"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            onChange({ ...section, image: URL.createObjectURL(file) });
-          }}
-        />
-      )}
     </div>
   );
 }
 
 /* ---------------- UI ---------------- */
 
-type NavItemProps = {
-  icon: React.ElementType;
-  label: string;
-  onClick: () => void;
-};
-
-function NavItem({ icon: Icon, label, onClick }: NavItemProps) {
+function NavItem({ icon: Icon, label, onClick, active }: any) {
   return (
-    <button onClick={onClick} className="flex gap-2 w-full">
-      <Icon size={18} /> {label}
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition ${
+        active
+          ? "bg-blue-50 text-blue-600"
+          : "hover:bg-gray-100 text-gray-600"
+      }`}
+    >
+      <Icon size={18} />
+      {label}
     </button>
   );
 }
 
-function Section({
-  title,
-  children,
-  action,
-}: {
-  title: string;
-  children: React.ReactNode;
-  action?: { label: string; onClick: () => void };
-}) {
+function Section({ title, children, action }: any) {
   return (
-    <div>
-      <div className="flex justify-between">
-        <h2>{title}</h2>
-        {action && <button onClick={action.onClick}>{action.label}</button>}
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        {action && (
+          <button onClick={action.onClick} className="btn-primary">
+            {action.label}
+          </button>
+        )}
       </div>
       {children}
     </div>
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
-  return <div className="bg-white p-4 border flex justify-between">{children}</div>;
-}
-
-function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-4">{children}</div>;
-}
-
-function Stat({ title, value }: { title: string; value: number }) {
+function Card({ children }: any) {
   return (
-    <div className="bg-white p-4 border">
-      <p>{title}</p>
-      <h3>{value}</h3>
+    <div className="bg-white p-4 rounded-xl border shadow-sm space-y-2">
+      {children}
     </div>
   );
 }
 
-function Btn({ label, onClick }: { label: string; onClick: () => void }) {
-  return <button onClick={onClick}>{label}</button>;
+function Stat({ title, value, icon: Icon }: any) {
+  return (
+    <div className="bg-white p-4 rounded-xl border shadow-sm flex justify-between">
+      <div>
+        <p className="text-xs text-gray-500">{title}</p>
+        <h3 className="font-bold text-lg">{value}</h3>
+      </div>
+      <Icon className="text-blue-600" />
+    </div>
+  );
 }
+
+/* ---------------- STYLES ---------------- */
+
+const styles = `
+.input {
+  @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none;
+}
+.btn-primary {
+  @apply bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700;
+}
+.btn-secondary {
+  @apply border px-3 py-2 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-1;
+}
+`;
