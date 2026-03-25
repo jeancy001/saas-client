@@ -71,7 +71,7 @@ export default function Contact() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen mt-10 pt-10 top-10">
+    <div className="bg-gray-50 min-h-screen mt-10  top-10">
       {/* HERO */}
       <div className="relative h-[260px] w-full">
         <Image
