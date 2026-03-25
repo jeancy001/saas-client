@@ -277,7 +277,7 @@ function InputField({
 /* INFO ITEM */
 function InfoItem({ icon: Icon, label, value }: any) {
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-start gap-3 mt-10 pt-10 top-10">
       <div className="bg-blue-100 text-blue-600 p-2 rounded-lg">
         <Icon size={18} />
       </div>
