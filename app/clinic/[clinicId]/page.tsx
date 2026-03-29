@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import AppointmentForm from "@/components/AppointementForm";
+import api from "@/lib/api";
+
 import {
   Stethoscope,
   User,
@@ -16,110 +19,65 @@ import {
 } from "lucide-react";
 
 /* ---------------- ANIMATIONS ---------------- */
-const fadeUp = { hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0 } };
-const stagger = { visible: { transition: { staggerChildren: 0.12 } } };
+const fadeUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const stagger = {
+  visible: { transition: { staggerChildren: 0.08 } },
+};
 
 /* ---------------- HERO ---------------- */
 const HeroSection = ({ clinicName }: { clinicName: string }) => {
-  const images = [
-    "/slides/nurse1.jpeg",
-    "/slides/nurse2.jpeg",
-    "/slides/nurse3.jpeg",
-  ];
-
+  const images = ["/slides/nurse1.jpeg", "/slides/nurse2.jpeg", "/slides/nurse3.jpeg"];
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    const i = setInterval(
-      () => setIndex((prev) => (prev + 1) % images.length),
-      5000
-    );
+    const i = setInterval(() => {
+      setIndex((prev) => (prev + 1) % images.length);
+    }, 5000);
     return () => clearInterval(i);
   }, []);
 
   return (
-    <section className="relative h-screen flex items-center justify-center text-white overflow-hidden w-full">
-      
-      {/* Background Slider */}
+    <section className="relative h-[90vh] flex items-center justify-center text-white overflow-hidden">
       <AnimatePresence>
         <motion.div
           key={index}
-          initial={{ opacity: 0, scale: 1.1 }}
+          initial={{ opacity: 0, scale: 1.05 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1 }}
           className="absolute inset-0"
         >
-          <Image
-            src={images[index]}
-            alt="clinic"
-            fill
-            priority
-            className="object-cover"
-          />
-
-          <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-blue-900/60" />
+          <Image src={images[index]} alt="" fill className="object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
         </motion.div>
       </AnimatePresence>
 
-      {/* Content */}
       <motion.div
         variants={stagger}
         initial="hidden"
         animate="visible"
-        className="relative z-10 text-center px-4 max-w-4xl"
+        className="relative z-10 text-center px-6 max-w-3xl"
       >
-        <motion.h1
-          variants={fadeUp}
-          className="text-5xl md:text-6xl font-bold mb-6 leading-tight"
-        >
+        <motion.h1 variants={fadeUp} className="text-4xl md:text-6xl font-bold leading-tight">
           {clinicName}
         </motion.h1>
 
-        <motion.p
-          variants={fadeUp}
-          className="text-lg text-gray-200 mb-8"
-        >
-          Soins médicaux de haute qualité, technologie moderne et expérience
-          patient premium à Kinshasa.
+        <motion.p variants={fadeUp} className="mt-4 text-gray-200 text-lg">
+          Excellence médicale, innovation et expérience patient moderne.
         </motion.p>
 
-        <motion.div
-          variants={fadeUp}
-          className="flex flex-wrap justify-center gap-4"
-        >
-          <a
-            href="#appointment"
-            className="flex items-center gap-2 bg-white text-blue-700 px-6 py-3 rounded-xl font-semibold shadow-lg hover:scale-105 transition"
-          >
-            <CalendarCheck size={18} />
-            Rendez-vous
+        <motion.div variants={fadeUp} className="mt-8 flex gap-4 justify-center">
+          <a href="#appointment" className="btn-primary">
+            <CalendarCheck size={18} /> Rendez-vous
           </a>
 
-          <a
-            href="tel:+243000000000"
-            className="flex items-center gap-2 bg-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
-          >
-            <Phone size={18} />
-            Appeler
+          <a href="tel:+243000000000" className="btn-outline">
+            <Phone size={18} /> Appeler
           </a>
-        </motion.div>
-
-        {/* Stats */}
-        <motion.div
-          variants={fadeUp}
-          className="grid grid-cols-3 gap-8 mt-12 text-center"
-        >
-          {[
-            { value: "10+", label: "Médecins" },
-            { value: "5k+", label: "Patients" },
-            { value: "24/7", label: "Disponibilité" },
-          ].map((s, i) => (
-            <div key={i}>
-              <p className="text-3xl font-bold">{s.value}</p>
-              <p className="text-sm text-gray-300">{s.label}</p>
-            </div>
-          ))}
         </motion.div>
       </motion.div>
     </section>
@@ -127,151 +85,141 @@ const HeroSection = ({ clinicName }: { clinicName: string }) => {
 };
 
 /* ---------------- WHY US ---------------- */
-const WhyUsSection = () => (
-  <section className="py-24 w-full px-10">
-    <h2 className="text-3xl font-semibold text-center mb-16">
-      Pourquoi nous choisir
-    </h2>
+const WhyUsSection = () => {
+  const items = [
+    { icon: Stethoscope, title: "Experts", desc: "Médecins qualifiés" },
+    { icon: Activity, title: "Technologie", desc: "Équipements modernes" },
+    { icon: User, title: "Patient", desc: "Expérience fluide" },
+    { icon: HeartPulse, title: "Soins", desc: "Approche personnalisée" },
+    { icon: ShieldCheck, title: "Sécurité", desc: "Hygiène stricte" },
+    { icon: Clock, title: "Rapidité", desc: "Consultations rapides" },
+  ];
 
-    <div className="grid md:grid-cols-3 gap-10">
-      {[
-        {
-          icon: <Stethoscope />,
-          title: "Expertise médicale",
-          desc: "Professionnels certifiés avec plusieurs années d'expérience.",
-        },
-        {
-          icon: <Activity />,
-          title: "Technologie avancée",
-          desc: "Équipements modernes pour diagnostics fiables.",
-        },
-        {
-          icon: <User />,
-          title: "Expérience premium",
-          desc: "Parcours patient fluide sans attente.",
-        },
-        {
-          icon: <HeartPulse />,
-          title: "Soins personnalisés",
-          desc: "Approche centrée sur chaque patient.",
-        },
-        {
-          icon: <ShieldCheck />,
-          title: "Sécurité",
-          desc: "Protocoles stricts et hygiène irréprochable.",
-        },
-        {
-          icon: <Clock />,
-          title: "Disponibilité",
-          desc: "Consultations rapides et urgences prises en charge.",
-        },
-      ].map((item, i) => (
-        <motion.div
-          key={i}
-          variants={fadeUp}
-          whileHover={{ y: -6 }}
-          className="bg-white p-8 rounded-2xl shadow-md hover:shadow-xl transition"
-        >
-          <div className="text-blue-600 mb-4">{item.icon}</div>
+  return (
+    <section className="py-24 px-6 max-w-6xl mx-auto">
+      <h2 className="section-title">Pourquoi nous choisir</h2>
 
-          <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+      <div className="grid md:grid-cols-3 gap-8 mt-14">
+        {items.map((item, i) => {
+          const Icon = item.icon;
 
-          <p className="text-gray-600 text-sm">{item.desc}</p>
-        </motion.div>
-      ))}
-    </div>
-  </section>
-);
+          return (
+            <motion.div
+              key={i}
+              variants={fadeUp}
+              whileHover={{ y: -6 }}
+              className="card-modern"
+            >
+              <div className="icon-box">
+                <Icon size={22} />
+              </div>
+              <h3 className="card-title">{item.title}</h3>
+              <p className="card-desc">{item.desc}</p>
+            </motion.div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
 
 /* ---------------- SPECIALTIES ---------------- */
-const SpecialtiesSection = () => (
-  <section className="bg-gray-100 py-24 w-full px-10">
-    <h2 className="text-3xl font-semibold text-center mb-16">
-      Nos Spécialités
-    </h2>
+const SpecialtiesSection = () => {
+  const specialties = [
+    "Cardiologie",
+    "Pédiatrie",
+    "Dermatologie",
+    "Médecine générale",
+    "Diabétologie",
+    "Gastro",
+  ];
 
-    <div className="grid md:grid-cols-3 gap-10">
-      {[
-        "Cardiologie",
-        "Gastro-entérologie",
-        "Diabétologie",
-        "Pédiatrie",
-        "Dermatologie",
-        "Médecine générale",
-      ].map((item, i) => (
-        <motion.div
-          key={i}
-          whileHover={{ scale: 1.05 }}
-          className="relative h-56 rounded-2xl overflow-hidden shadow-lg group"
-        >
-          <Image
-            src="/slides/nurse2.jpeg"
-            alt="specialty"
-            fill
-            className="object-cover group-hover:scale-110 transition"
-          />
+  return (
+    <section className="py-24 bg-gray-100 px-6">
+      <div className="max-w-6xl mx-auto">
+        <h2 className="section-title">Nos Spécialités</h2>
 
-          <div className="absolute inset-0 bg-black/50 flex items-end p-6">
-            <h3 className="text-white text-lg font-semibold">{item}</h3>
-          </div>
-        </motion.div>
-      ))}
-    </div>
-  </section>
-);
+        <div className="grid md:grid-cols-3 gap-8 mt-14">
+          {specialties.map((s, i) => (
+            <div key={i} className="relative h-56 rounded-2xl overflow-hidden group">
+              <Image src="/slides/nurse2.jpeg" alt="" fill className="object-cover group-hover:scale-110 transition" />
+
+              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition" />
+
+              <div className="absolute bottom-4 left-4 text-white font-semibold text-lg">
+                {s}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
 
 /* ---------------- ABOUT ---------------- */
 const AboutSection = () => (
-  <section className="py-24 grid md:grid-cols-2 gap-16 items-center px-10">
+  <section className="py-24 px-6 max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
     <div>
-      <h2 className="text-3xl font-semibold mb-6">À propos de la clinique</h2>
+      <h2 className="section-title text-left">À propos</h2>
 
-      <p className="text-gray-600 mb-6 leading-relaxed">
-        Nous combinons expertise médicale, innovation technologique et
-        excellence du service pour offrir une prise en charge complète et
-        moderne.
+      <p className="text-gray-600 mt-6 leading-relaxed">
+        Nous offrons une médecine moderne avec une approche centrée sur le patient,
+        combinant expertise médicale et technologies avancées.
       </p>
 
-      <ul className="space-y-3 text-gray-600">
+      <ul className="mt-8 space-y-3 text-gray-700">
         <li>✔ Équipe multidisciplinaire</li>
-        <li>✔ Équipements de pointe</li>
+        <li>✔ Technologie avancée</li>
         <li>✔ Suivi personnalisé</li>
       </ul>
     </div>
 
-    <div className="relative h-[400px] rounded-3xl overflow-hidden shadow-2xl">
-      <Image src="/slides/nurse1.jpeg" alt="about" fill className="object-cover" />
+    <div className="relative h-96 rounded-3xl overflow-hidden shadow-xl">
+      <Image src="/slides/nurse1.jpeg" alt="" fill className="object-cover" />
     </div>
   </section>
 );
 
 /* ---------------- CTA ---------------- */
 const CTASection = () => (
-  <section className="bg-blue-600 py-20 text-center text-white w-full">
-    <h2 className="text-3xl font-semibold mb-4">
-      Besoin d'une consultation rapide ?
+  <section className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-20 text-center">
+    <h2 className="text-3xl font-semibold mb-6">
+      Consultation rapide ?
     </h2>
 
-    <p className="mb-6 text-blue-100">
-      Prenez rendez-vous en ligne en quelques secondes.
-    </p>
-
-    <a
-      href="#appointment"
-      className="bg-white text-blue-700 px-6 py-3 rounded-xl font-semibold hover:scale-105 transition inline-flex items-center gap-2"
-    >
-      <CalendarCheck size={18} />
-      Réserver maintenant
+    <a href="#appointment" className="btn-white">
+      <CalendarCheck size={18} /> Réserver maintenant
     </a>
   </section>
 );
 
 /* ---------------- MAIN ---------------- */
 export default function ClinicHomePage() {
-  const [clinic] = useState({ name: "Nyota ya Asubuyi" });
+  const params = useParams();
+  const clinicId = params?.clinicId as string;
+
+  const [clinic, setClinic] = useState({ name: "Chargement..." });
+
+  useEffect(() => {
+    if (!clinicId) return;
+
+    const fetchClinic = async () => {
+      try {
+        const res = await api.get(`/clinic/clinic-link/${clinicId}`);
+        setClinic(res.data.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchClinic();
+  }, [clinicId]);
+
+  if (!clinicId) return <div className="p-10 text-red-600">Invalid clinic</div>;
 
   return (
-    <div className="bg-gray-50 w-full overflow-x-hidden">
+    <div className="bg-gray-50">
 
       <HeroSection clinicName={clinic.name} />
 
@@ -283,16 +231,94 @@ export default function ClinicHomePage() {
 
       <CTASection />
 
-      {/* Appointment */}
-      <section id="appointment" className="py-24 w-full flex justify-center">
-        <div className="w-full max-w-4xl bg-white p-10 rounded-2xl shadow-lg">
-          <h2 className="text-3xl font-semibold text-center mb-10">
+      {/* APPOINTMENT */}
+      <section id="appointment" className="py-24 px-6">
+        <div className="max-w-3xl mx-auto bg-white p-10 rounded-3xl shadow-xl">
+          <h2 className="section-title text-center mb-8">
+            <CalendarCheck className="inline mr-2" />
             Prendre Rendez-vous
           </h2>
 
-          <AppointmentForm clinicId="default" />
+          <AppointmentForm clinicId={clinicId} />
         </div>
       </section>
+
+      {/* GLOBAL STYLES */}
+      <style jsx global>{`
+        .section-title {
+          font-size: 32px;
+          font-weight: 700;
+          text-align: center;
+        }
+
+        .card-modern {
+          background: white;
+          padding: 28px;
+          border-radius: 20px;
+          text-align: center;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+          transition: all 0.3s ease;
+        }
+
+        .card-modern:hover {
+          box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+        }
+
+        .icon-box {
+          width: 50px;
+          height: 50px;
+          margin: auto;
+          margin-bottom: 12px;
+          background: #eff6ff;
+          color: #2563eb;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .card-title {
+          font-weight: 600;
+          margin-top: 10px;
+        }
+
+        .card-desc {
+          font-size: 14px;
+          color: #6b7280;
+          margin-top: 4px;
+        }
+
+        .btn-primary {
+          background: #2563eb;
+          color: white;
+          padding: 12px 22px;
+          border-radius: 12px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-weight: 600;
+        }
+
+        .btn-outline {
+          border: 1px solid white;
+          padding: 12px 22px;
+          border-radius: 12px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .btn-white {
+          background: white;
+          color: #2563eb;
+          padding: 12px 22px;
+          border-radius: 12px;
+          font-weight: 600;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+      `}</style>
     </div>
   );
 }

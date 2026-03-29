@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { notFound } from "next/navigation";
 import AppointmentForm from "@/components/AppointementForm";
 
+
 export default function AppointmentsPage() {
   const params = useParams();
   const clinicIdParam = params?.clinicId;
@@ -11,6 +12,7 @@ export default function AppointmentsPage() {
   // Ensure clinicId is a single string
   const clinicId =
     Array.isArray(clinicIdParam) ? clinicIdParam[0] : clinicIdParam;
+    console.log("ClinicId : ", clinicId)
 
   if (!clinicId) return notFound();
 

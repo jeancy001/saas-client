@@ -5,9 +5,20 @@ import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
-import { Home, Users, Calendar, Mail, Menu, X, Phone } from "lucide-react";
+import {
+  Home,
+  Users,
+  Calendar,
+  Mail,
+  Menu,
+  X,
+  Phone,
+  LogOut,
+  UserCircle,
+} from "lucide-react";
 import { GrDashboard } from "react-icons/gr";
 import api from "@/lib/api";
+import { useUser } from "@/lib/userContext";
 
 /* ---------------- TYPES ---------------- */
 
@@ -40,15 +51,13 @@ const resolveLogo = (logo?: string | null) => {
 
 export default function Navbar({
   clinicId,
-  clinicName,
-  logo,
-  clinicEmail,
-  clinicPhone,
   advertisement,
 }: NavbarProps) {
   const pathname = usePathname();
   const params = useParams();
   const controls = useAnimation();
+
+  const { user, logout } = useUser();
 
   const [clinic, setClinic] = useState<ClinicData>({
     clinicId: "",
@@ -61,6 +70,7 @@ export default function Navbar({
   const [mounted, setMounted] = useState(false);
   const [showInfoBar, setShowInfoBar] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const resolvedClinicId =
     clinicId ||
@@ -73,7 +83,7 @@ export default function Navbar({
     { name: "Accueil", href: `/clinic/${clinic.clinicId}`, icon: Home },
     { name: "Dashboard", href: `/clinic/${clinic.clinicId}/dashboard`, icon: GrDashboard },
     { name: "Patients", href: `/clinic/${clinic.clinicId}/patients`, icon: Users },
-    { name: "Rendez-vous", href: `/clinic/${clinic.clinicId}/appointments`, icon: Calendar },
+    { name: "Rendez-vous", href: `/clinic/${clinic.clinicId}/appointment`, icon: Calendar },
     { name: "Contact", href: `/clinic/${clinic.clinicId}/contact`, icon: Mail },
   ];
 
@@ -138,8 +148,8 @@ export default function Navbar({
             exit={{ y: -10, opacity: 0 }}
             className="bg-slate-900 text-gray-200 text-xs border-b border-white/10"
           >
-            <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap justify-between items-center gap-3">
-              <div className="flex flex-wrap items-center gap-4">
+            <div className="max-w-7xl mx-auto px-4 py-2 flex justify-between items-center">
+              <div className="flex gap-4">
                 {clinic.email && (
                   <span className="flex items-center gap-1">
                     <Mail size={14} /> {clinic.email}
@@ -169,45 +179,33 @@ export default function Navbar({
         className="bg-slate-900 border-b border-white/10"
       >
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-full">
-          {/* LOGO + NAME */}
-          <Link
-            href={`/clinic/${clinic.clinicId}`}
-            className="flex items-center gap-3"
-          >
+          {/* LOGO */}
+          <Link href={`/clinic/${clinic.clinicId}`} className="flex items-center gap-3">
             <div className="relative w-10 h-10 rounded-full overflow-hidden border border-white/20">
               <Image
                 src={clinic.logo}
-                alt="clinic logo"
+                alt=""
                 fill
                 className="object-cover"
                 unoptimized={clinic.logo.startsWith("data:image")}
               />
             </div>
-
-            {/* FIXED: always show clinic name beside logo */}
-            <div className="flex flex-col leading-tight">
-              <span className="text-white font-semibold text-sm sm:text-base">
-                {clinic.name}
-              </span>
-              <span className="text-gray-400 text-xs hidden sm:block">
-                Healthcare Center
-              </span>
-            </div>
+            <span className="text-white font-semibold">{clinic.name}</span>
           </Link>
 
-          {/* DESKTOP NAV */}
-          <div className="hidden md:flex items-center gap-2">
+          {/* DESKTOP */}
+          <div className="hidden md:flex items-center gap-3">
             {navItems.map((item) => {
-              const isActive = pathname === item.href;
               const Icon = item.icon;
+              const isActive = pathname === item.href;
 
               return (
                 <Link key={item.name} href={item.href}>
                   <div
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${
                       isActive
                         ? "bg-blue-600 text-white"
-                        : "text-gray-300 hover:bg-white/10 hover:text-white"
+                        : "text-gray-300 hover:bg-white/10"
                     }`}
                   >
                     <Icon size={16} />
@@ -216,82 +214,114 @@ export default function Navbar({
                 </Link>
               );
             })}
+
+            {/* AUTH */}
+            {user ? (
+              <div className="relative">
+                <button
+                  onClick={() => setProfileOpen((p) => !p)}
+                  className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg"
+                >
+                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm">
+                    {user.username?.charAt(0)?.toUpperCase()}
+                  </div>
+                  <span className="text-white text-sm">{user.username}</span>
+                </button>
+
+                <AnimatePresence>
+                  {profileOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg overflow-hidden"
+                    >
+                      <Link href={`/clinic/${clinic.clinicId}/profile`}>
+                        <div className="px-4 py-3 hover:bg-gray-100 flex gap-2">
+                          <UserCircle size={16} /> Profile
+                        </div>
+                      </Link>
+
+                      <button
+                        onClick={logout}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-100 flex gap-2 text-red-500"
+                      >
+                        <LogOut size={16} /> Logout
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <Link href="/login">
+                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
+                  Login
+                </button>
+              </Link>
+            )}
           </div>
 
-          {/* MOBILE BUTTON */}
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="md:hidden text-white"
-          >
-            <Menu size={24} />
+          {/* MOBILE BTN */}
+          <button onClick={() => setMobileOpen(true)} className="md:hidden text-white">
+            <Menu />
           </button>
         </div>
       </motion.nav>
 
-      {/* MOBILE DRAWER */}
+      {/* MOBILE */}
       <AnimatePresence>
         {mobileOpen && (
           <>
             <motion.div
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 bg-black/40 z-40"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40"
             />
 
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              className="fixed top-0 right-0 h-full w-72 bg-slate-900 z-50 p-6 flex flex-col"
+              className="fixed right-0 top-0 h-full w-72 bg-slate-900 p-6 flex flex-col"
             >
-              {/* HEADER */}
-              <div className="flex justify-between items-center mb-6">
-                <span className="text-white font-semibold">Menu</span>
-                <button onClick={() => setMobileOpen(false)}>
-                  <X className="text-white" />
-                </button>
+              <div className="flex justify-between mb-6">
+                <span className="text-white">Menu</span>
+                <X onClick={() => setMobileOpen(false)} className="text-white" />
               </div>
 
-              {/* CLINIC HEADER */}
-              <div className="flex items-center gap-3 mb-6">
-                <div className="relative w-10 h-10 rounded-full overflow-hidden">
-                  <Image src={clinic.logo} alt="logo" fill className="object-cover" />
+              {/* USER */}
+              {user && (
+                <div className="flex items-center gap-3 mb-6 border-b border-white/10 pb-4">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white">
+                    {user.username?.charAt(0)?.toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-white text-sm">{user.username}</p>
+                    <p className="text-gray-400 text-xs">{user.email}</p>
+                  </div>
                 </div>
-                <span className="text-white font-medium">{clinic.name}</span>
-              </div>
+              )}
 
-              {/* NAV ITEMS */}
-              <div className="flex flex-col gap-2">
-                {navItems.map((item) => {
-                  const Icon = item.icon;
+              {/* NAV */}
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link key={item.name} href={item.href}>
+                    <div className="flex items-center gap-3 text-gray-200 py-3">
+                      <Icon size={18} /> {item.name}
+                    </div>
+                  </Link>
+                );
+              })}
 
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={() => setMobileOpen(false)}
-                    >
-                      <div className="flex items-center gap-3 text-gray-200 px-4 py-3 rounded-lg hover:bg-white/10">
-                        <Icon size={18} />
-                        {item.name}
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-
-              {/* CTA */}
-              <Link
-                href={`/clinic/${clinic.clinicId}/appointments`}
-                onClick={() => setMobileOpen(false)}
-                className="mt-auto"
-              >
-                <button className="w-full bg-blue-600 text-white py-3 rounded-lg">
-                  Prendre Rendez-vous
+              {/* LOGOUT */}
+              {user && (
+                <button
+                  onClick={logout}
+                  className="mt-auto border border-red-500 text-red-500 py-3 rounded-lg"
+                >
+                  Logout
                 </button>
-              </Link>
+              )}
             </motion.div>
           </>
         )}

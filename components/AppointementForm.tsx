@@ -2,77 +2,150 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { useUser } from "@/lib/userContext";
+import api from "@/lib/api";
 
 interface Props {
-  clinicId: string;
+  clinicId?: string; // ✅ optional (safer)
   doctors?: { _id: string; name: string; specialty?: string }[];
 }
 
-export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // replace with real auth
-  const [error, setError] = useState("");
+interface FormState {
+  doctorId: string;
+  motif: string;
+  date: string;
+  name: string;
+  email: string;
+  phone: string;
+}
 
-  const [form, setForm] = useState({
+export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
+  const router = useRouter();
+  const { user, accessToken } = useUser();
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const [form, setForm] = useState<FormState>({
     doctorId: "",
     motif: "",
     date: "",
+    name: "",
+    email: "",
+    phone: "",
   });
 
+  /* ---------------- HANDLE INPUT ---------------- */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
   };
 
+  /* ---------------- VALIDATION ---------------- */
   const validate = () => {
-    if (!form.motif) return "Reason is required";
+    if (!clinicId) return "Clinic not found"; // ✅ FIX
+
+    if (!form.motif.trim()) return "Reason for consultation is required";
     if (!form.date) return "Date is required";
+
+    const selectedDate = new Date(form.date);
+    const now = new Date();
+
+    if (selectedDate.getTime() < now.getTime()) {
+      return "Date cannot be in the past";
+    }
+
+    if (!user) {
+      if (!form.name.trim()) return "Name is required";
+      if (!form.email.trim()) return "Email is required";
+
+      if (!/\S+@\S+\.\S+/.test(form.email)) {
+        return "Invalid email format";
+      }
+    }
+
     return "";
   };
 
+  /* ---------------- SUBMIT ---------------- */
   const handleSubmit = async () => {
-    const err = validate();
-    if (err) {
-      setError(err);
-      return;
-    }
+    if (loading) return;
 
-    if (!isAuthenticated) {
-      // 🔥 replace with real redirect
-      window.location.href = "/login?redirect=/appointment";
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setLoading(true);
+    setError(null);
+    setSuccess(null);
+
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/appointments`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            // Authorization: `Bearer ${token}` // add later
-          },
-          body: JSON.stringify({
-            clinicId,
-            doctorId: form.doctorId || null,
-            motif: form.motif,
-            date: form.date,
-          }),
+      const payload: any = {
+        clinicId,
+        doctorId: form.doctorId || null,
+        motif: form.motif.trim(),
+        date: new Date(form.date).toISOString(),
+      };
+
+      if (!user) {
+        payload.guest = {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+        };
+      }
+
+      await api.post("/clinic/appointment", payload, {
+        headers: accessToken
+          ? { Authorization: `Bearer ${accessToken}` }
+          : {},
+      });
+
+      setSuccess("Appointment booked successfully!");
+
+      setForm({
+        doctorId: "",
+        motif: "",
+        date: "",
+        name: "",
+        email: "",
+        phone: "",
+      });
+
+      setTimeout(() => {
+        if (clinicId) {
+          router.push(`/clinic/${clinicId}/appointments`);
         }
-      );
+      }, 1200);
 
-      if (!res.ok) throw new Error();
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to book appointment";
 
-      window.location.href = "/dashboard/appointments";
-    } catch {
-      setError("Failed to book appointment");
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
+  /* ---------------- MIN DATE ---------------- */
+  const getMinDate = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  };
+
+  /* ---------------- UI ---------------- */
   return (
     <motion.div
       className="max-w-xl mx-auto bg-white shadow-lg rounded-2xl p-6 space-y-5 border"
@@ -83,10 +156,15 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
         Book Appointment
       </h2>
 
-      {/* ERROR */}
       {error && (
         <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
           {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="text-sm text-green-600 bg-green-50 p-3 rounded-lg">
+          {success}
         </div>
       )}
 
@@ -94,6 +172,7 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
       {doctors.length > 0 && (
         <select
           name="doctorId"
+          value={form.doctorId}
           onChange={handleChange}
           className="input"
         >
@@ -110,41 +189,69 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
       <input
         name="motif"
         placeholder="Reason for consultation"
-        className="input"
+        value={form.motif}
         onChange={handleChange}
+        className="input"
       />
 
       {/* DATE */}
       <input
         type="datetime-local"
         name="date"
-        className="input"
+        value={form.date}
+        min={getMinDate()}
         onChange={handleChange}
+        className="input"
       />
 
-      {/* LOGIN NOTICE */}
-      {!isAuthenticated && (
-        <div className="text-xs text-yellow-700 bg-yellow-50 p-3 rounded-lg">
-          You will be asked to login before confirming
-        </div>
+      {/* GUEST */}
+      {!user && (
+        <>
+          <input
+            name="name"
+            placeholder="Your Name"
+            value={form.name}
+            onChange={handleChange}
+            className="input"
+          />
+
+          <input
+            name="email"
+            placeholder="Your Email"
+            value={form.email}
+            onChange={handleChange}
+            className="input"
+          />
+
+          <input
+            name="phone"
+            placeholder="Phone (optional)"
+            value={form.phone}
+            onChange={handleChange}
+            className="input"
+          />
+
+          <div className="text-xs text-blue-700 bg-blue-50 p-3 rounded-lg">
+            You are booking as a guest (no login required)
+          </div>
+        </>
       )}
 
-      {/* SUBMIT */}
       <button
         onClick={handleSubmit}
-        disabled={loading}
+        disabled={loading || !clinicId} // ✅ FIX
         className="btn-primary w-full"
       >
-        {loading ? "Processing..." : "Continue"}
+        {loading ? "Processing..." : "Book Appointment"}
       </button>
 
-      {/* STYLES */}
       <style jsx>{`
         .input {
           width: 100%;
           padding: 12px;
           border-radius: 10px;
           border: 1px solid #e5e7eb;
+          margin-bottom: 0.5rem;
         }
         .input:focus {
           outline: none;
@@ -156,6 +263,10 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
           padding: 12px;
           border-radius: 10px;
           font-weight: 500;
+        }
+        .btn-primary:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
         }
       `}</style>
     </motion.div>
