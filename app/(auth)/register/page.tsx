@@ -123,7 +123,8 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* LEFT SIDE */}
+
+      {/* LEFT */}
       <div className="hidden md:flex flex-col justify-between bg-blue-700 text-white p-12">
         <div>
           <div className="flex items-center gap-3 text-xl font-semibold">
@@ -131,12 +132,12 @@ export default function RegisterPage() {
             ClinicCare Platform
           </div>
 
-          <h2 className="mt-12 text-4xl font-bold leading-tight">
+          <h2 className="mt-12 text-4xl font-bold">
             Build your medical workspace
           </h2>
 
           <p className="mt-4 text-blue-100 max-w-md">
-            Manage patients, doctors and appointments in a unified clinic system.
+            Manage patients, doctors and appointments in a unified system.
           </p>
         </div>
 
@@ -146,9 +147,10 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* RIGHT SIDE */}
+      {/* RIGHT */}
       <div className="flex items-center justify-center px-6 py-10">
         <motion.div className="w-full max-w-md bg-white shadow-2xl rounded-2xl p-8 border border-gray-100">
+
           {/* HEADER */}
           <div className="text-center mb-6">
             <div className="flex justify-center mb-2">
@@ -161,26 +163,23 @@ export default function RegisterPage() {
 
             <p className="text-sm text-gray-500 mt-1">
               {step === "form"
-                ? "Fill in your clinic details"
+                ? "Fill your clinic information"
                 : "Enter OTP sent to your email"}
             </p>
           </div>
 
           {/* ERROR / SUCCESS */}
-          {error && (
-            <div className="text-red-500 text-sm mb-3">{error}</div>
-          )}
-          {success && (
-            <div className="text-green-600 text-sm mb-3">{success}</div>
-          )}
+          {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+          {success && <p className="text-green-600 text-sm mb-3">{success}</p>}
 
-          {/* ================= FORM ================= */}
+          {/* FORM */}
           {step === "form" && (
             <form onSubmit={handleSubmit} className="space-y-4">
 
               {/* CLINIC */}
               <div className="relative">
                 <Building2 className="absolute left-3 top-3 text-gray-400" />
+
                 <select
                   name="clinicId"
                   value={form.clinicId}
@@ -191,9 +190,10 @@ export default function RegisterPage() {
                   <option value="">
                     {loadingClinics ? "Loading clinics..." : "Select clinic"}
                   </option>
+
                   {clinics.map((c) => (
                     <option key={c._id} value={c.clinicId}>
-                      {c.name}
+                      {c.name} — ID: {c.clinicId}
                     </option>
                   ))}
                 </select>
@@ -237,6 +237,7 @@ export default function RegisterPage() {
                   className="w-full pl-10 pr-10 py-3 border rounded-xl"
                   required
                 />
+
                 <button
                   type="button"
                   onClick={() => setShowPassword((p) => !p)}
@@ -289,7 +290,7 @@ export default function RegisterPage() {
             </form>
           )}
 
-          {/* ================= OTP ================= */}
+          {/* OTP */}
           {step === "otp" && (
             <div className="space-y-4">
               <input
@@ -322,6 +323,7 @@ export default function RegisterPage() {
               Sign in
             </Link>
           </p>
+
         </motion.div>
       </div>
     </div>
