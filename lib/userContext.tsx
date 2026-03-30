@@ -11,14 +11,10 @@ import api from "./api";
 
 interface User {
   _id: string;
-  username?: string;
   email: string;
-  role?: string;
-  gender?: string;
-  tel?: string;
-  country?: string;
-  city?: string;
   clinicId: string;
+  username?: string;
+  role?: string;
   profileUrl?: string;
   isVerified?: boolean;
 }
@@ -26,10 +22,10 @@ interface User {
 interface UserContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  register: (data: any) => Promise<any>;
-  logout: () => Promise<void>;
-  fetchMe: () => Promise<User | null>;
+  login: any;
+  register: any;
+  logout: any;
+  fetchMe: any;
   verifyOtp: any;
   requestCode: any;
   resendOtp: any;
@@ -43,9 +39,9 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const useUser = () => {
-  const context = useContext(UserContext);
-  if (!context) throw new Error("useUser must be used within UserProvider");
-  return context;
+  const ctx = useContext(UserContext);
+  if (!ctx) throw new Error("useUser must be used within UserProvider");
+  return ctx;
 };
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
@@ -53,14 +49,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   /* ---------------- LOGIN ---------------- */
-  const login = async (email: string, password: string): Promise<User> => {
+  const login = async (email: string, password: string) => {
     const res = await api.post("auth/login", { email, password });
 
-    const { user, accessToken } = res.data;
-
-    if (!user?.clinicId) {
-      throw new Error("User not assigned to any clinic");
-    }
+    const { accessToken, user } = res.data;
 
     if (accessToken) {
       localStorage.setItem("accessToken", accessToken);
@@ -68,12 +60,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
     setUser(user);
     return user;
-  };
-
-  /* ---------------- REGISTER ---------------- */
-  const register = async (data: any) => {
-    const res = await api.post("auth/register", data);
-    return res.data;
   };
 
   /* ---------------- LOGOUT ---------------- */
@@ -87,75 +73,72 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   /* ---------------- FETCH ME ---------------- */
-  const fetchMe = async (): Promise<User | null> => {
+  const fetchMe = async () => {
     try {
       const res = await api.get("auth/me");
-      const user = res.data.user;
-
-      if (!user?.clinicId) throw new Error("Invalid user");
-
-      setUser(user);
-      return user;
+      setUser(res.data.user);
+      return res.data.user;
     } catch {
       setUser(null);
       return null;
-    } finally {
-      setLoading(false);
     }
   };
 
-  /* ---------------- OTP / AUTH ---------------- */
+  /* ---------------- INIT (IMPORTANT) ---------------- */
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        // 🔥 FIRST: try refresh using cookie
+        const res = await api.post("auth/refresh");
 
-  const verifyOtp = async (email: string, code: string, context?: string) =>
-    (await api.post("auth/verify-otp", { email, otpCode: code, context })).data;
+        if (res.data.accessToken) {
+          localStorage.setItem("accessToken", res.data.accessToken);
+        }
+      } catch {
+        // ignore (no session)
+      }
 
-  const requestCode = async (email: string, context?: string) =>
-    (await api.post("auth/request-code", { email, context })).data;
+      // 🔥 THEN: fetch user
+      await fetchMe();
 
-  const resendOtp = async (email: string, context?: string) =>
-    (await api.post("auth/resend-otp", { email, context })).data;
+      setLoading(false);
+    };
 
-  const resetPassword = async (
-    email: string,
-    code: string,
-    newPassword: string
-  ) =>
-    (await api.post("auth/reset-password", { email, code, newPassword })).data;
+    initAuth();
+  }, []);
 
-  /* ---------------- PROFILE ---------------- */
+  /* ---------------- OTHER METHODS ---------------- */
+
+  const register = (data: any) => api.post("auth/register", data);
+
+  const verifyOtp = (email: string, code: string, context?: string) =>
+    api.post("auth/verify-otp", { email, otpCode: code, context });
+
+  const requestCode = (email: string, context?: string) =>
+    api.post("auth/request-code", { email, context });
+
+  const resendOtp = requestCode;
+
+  const resetPassword = (email: string, code: string, newPassword: string) =>
+    api.post("auth/reset-password", { email, code, newPassword });
 
   const updateProfile = async (formData: FormData) => {
-    const res = await api.put("auth/update-profile", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
+    const res = await api.put("auth/update-profile", formData);
     setUser(res.data.user);
     return res.data;
   };
 
-  const updatePassword = async (
-    currentPassword: string,
-    newPassword: string
-  ) =>
-    (await api.put("auth/update-password", {
-      currentPassword,
-      newPassword,
-    })).data;
+  const updatePassword = (currentPassword: string, newPassword: string) =>
+    api.put("auth/update-password", { currentPassword, newPassword });
 
   const getProfiles = async () =>
     (await api.get("auth/profiles")).data.users;
 
   const deleteProfile = async () => {
-    const res = await api.delete("auth/delete");
+    await api.delete("auth/delete");
     localStorage.removeItem("accessToken");
     setUser(null);
-    return res.data;
   };
-
-  /* ---------------- INIT ---------------- */
-  useEffect(() => {
-    fetchMe();
-  }, []);
 
   return (
     <UserContext.Provider
