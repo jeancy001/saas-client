@@ -2,17 +2,11 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useUser } from "@/lib/userContext";
 import api from "@/lib/api";
 
-interface Props {
-  clinicId?: string; // ✅ optional (safer)
-  doctors?: { _id: string; name: string; specialty?: string }[];
-}
-
 interface FormState {
-  doctorId: string;
   motif: string;
   date: string;
   name: string;
@@ -20,16 +14,24 @@ interface FormState {
   phone: string;
 }
 
-export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
+export default function AppointmentForm({
+  doctorId,
+}: {
+  doctorId?: string;
+}) {
   const router = useRouter();
-  const { user, accessToken } = useUser();
+  const params = useParams();
+  const { user } = useUser();
+
+  const clinicId = params?.clinicId
+    ? String(params.clinicId)
+    : undefined;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormState>({
-    doctorId: "",
     motif: "",
     date: "",
     name: "",
@@ -37,7 +39,6 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
     phone: "",
   });
 
-  /* ---------------- HANDLE INPUT ---------------- */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -47,39 +48,33 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
     }));
   };
 
-  /* ---------------- VALIDATION ---------------- */
   const validate = () => {
-    if (!clinicId) return "Clinic not found"; // ✅ FIX
+    if (!clinicId) return "Clinic not found";
+    if (!form.motif.trim()) return "Reason required";
+    if (!form.date) return "Date required";
 
-    if (!form.motif.trim()) return "Reason for consultation is required";
-    if (!form.date) return "Date is required";
+    const date = new Date(form.date);
+    if (isNaN(date.getTime())) return "Invalid date";
 
-    const selectedDate = new Date(form.date);
-    const now = new Date();
-
-    if (selectedDate.getTime() < now.getTime()) {
+    if (date.getTime() < Date.now()) {
       return "Date cannot be in the past";
     }
 
     if (!user) {
-      if (!form.name.trim()) return "Name is required";
-      if (!form.email.trim()) return "Email is required";
-
-      if (!/\S+@\S+\.\S+/.test(form.email)) {
-        return "Invalid email format";
-      }
+      if (!form.name.trim()) return "Name required";
+      if (!form.email.trim()) return "Email required";
+      if (!/\S+@\S+\.\S+/.test(form.email)) return "Invalid email";
     }
 
     return "";
   };
 
-  /* ---------------- SUBMIT ---------------- */
   const handleSubmit = async () => {
     if (loading) return;
 
-    const validationError = validate();
-    if (validationError) {
-      setError(validationError);
+    const err = validate();
+    if (err) {
+      setError(err);
       return;
     }
 
@@ -89,11 +84,14 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
 
     try {
       const payload: any = {
-        clinicId,
-        doctorId: form.doctorId || null,
         motif: form.motif.trim(),
         date: new Date(form.date).toISOString(),
       };
+
+      // ✅ optional doctorId
+      if (doctorId) {
+        payload.doctorId = doctorId;
+      }
 
       if (!user) {
         payload.guest = {
@@ -103,16 +101,11 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
         };
       }
 
-      await api.post("/clinic/appointment", payload, {
-        headers: accessToken
-          ? { Authorization: `Bearer ${accessToken}` }
-          : {},
-      });
+      await api.post(`/clinic/appointment/${clinicId}`, payload);
 
-      setSuccess("Appointment booked successfully!");
+      setSuccess("Appointment booked successfully");
 
       setForm({
-        doctorId: "",
         motif: "",
         date: "",
         name: "",
@@ -121,31 +114,21 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
       });
 
       setTimeout(() => {
-        if (clinicId) {
-          router.push(`/clinic/${clinicId}/appointments`);
-        }
-      }, 1200);
-
+        router.push(`/clinic/${clinicId}/appointment`);
+      }, 800);
     } catch (err: any) {
-      const message =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to book appointment";
-
-      setError(message);
+      setError(err?.response?.data?.message || "Booking failed");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------------- MIN DATE ---------------- */
   const getMinDate = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     return now.toISOString().slice(0, 16);
   };
 
-  /* ---------------- UI ---------------- */
   return (
     <motion.div
       className="max-w-xl mx-auto bg-white shadow-lg rounded-2xl p-6 space-y-5 border"
@@ -168,24 +151,6 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
         </div>
       )}
 
-      {/* DOCTOR */}
-      {doctors.length > 0 && (
-        <select
-          name="doctorId"
-          value={form.doctorId}
-          onChange={handleChange}
-          className="input"
-        >
-          <option value="">Select Doctor (optional)</option>
-          {doctors.map((d) => (
-            <option key={d._id} value={d._id}>
-              {d.name} {d.specialty ? `- ${d.specialty}` : ""}
-            </option>
-          ))}
-        </select>
-      )}
-
-      {/* MOTIF */}
       <input
         name="motif"
         placeholder="Reason for consultation"
@@ -194,7 +159,6 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
         className="input"
       />
 
-      {/* DATE */}
       <input
         type="datetime-local"
         name="date"
@@ -204,7 +168,6 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
         className="input"
       />
 
-      {/* GUEST */}
       {!user && (
         <>
           <input
@@ -230,16 +193,12 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
             onChange={handleChange}
             className="input"
           />
-
-          <div className="text-xs text-blue-700 bg-blue-50 p-3 rounded-lg">
-            You are booking as a guest (no login required)
-          </div>
         </>
       )}
 
       <button
         onClick={handleSubmit}
-        disabled={loading || !clinicId} // ✅ FIX
+        disabled={loading || !clinicId}
         className="btn-primary w-full"
       >
         {loading ? "Processing..." : "Book Appointment"}
@@ -251,7 +210,6 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
           padding: 12px;
           border-radius: 10px;
           border: 1px solid #e5e7eb;
-          margin-bottom: 0.5rem;
         }
         .input:focus {
           outline: none;
@@ -266,7 +224,6 @@ export default function AppointmentForm({ clinicId, doctors = [] }: Props) {
         }
         .btn-primary:disabled {
           opacity: 0.7;
-          cursor: not-allowed;
         }
       `}</style>
     </motion.div>

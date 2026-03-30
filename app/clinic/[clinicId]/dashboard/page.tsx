@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Stethoscope,
-  UserPlus,
   Calendar,
-  FileText,
   Users,
   Activity,
   Clock,
@@ -38,19 +36,79 @@ type Nurse = {
   availability: Availability[];
 };
 
+type Appointment = {
+  _id: string;
+  motif: string;
+  date: string;
+  status: "pending" | "confirmed" | "cancelled";
+};
+
 type Person = Doctor | Nurse;
 
 /* ---------------- COMPONENT ---------------- */
 
 export default function ClinicDashboard() {
+  const clinicId = "en1rcy4q";
+
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "doctors" | "availability"
   >("dashboard");
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [nurses, setNurses] = useState<Nurse[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
-  /* ---------------- LOGIC ---------------- */
+  /* ---------------- APPOINTMENTS API ---------------- */
+
+  const fetchAppointments = async () => {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/clinic/appointment/${clinicId}/admin`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    const data = await res.json();
+    setAppointments(data?.data || []);
+  };
+
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  const updateStatus = async (id: string, status: string) => {
+    await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/clinic/appointment/${clinicId}/${id}/status`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ status }),
+      }
+    );
+
+    fetchAppointments();
+  };
+
+  const deleteAppointment = async (id: string) => {
+    await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/clinic/appointment/${clinicId}/${id}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    fetchAppointments();
+  };
+
+  /* ---------------- DOCTORS ---------------- */
 
   const addDoctor = () =>
     setDoctors((prev) => [
@@ -72,9 +130,7 @@ export default function ClinicDashboard() {
 
     setDoctors((prev) =>
       prev.map((d) =>
-        d.id === id
-          ? { ...d, availability: [...d.availability, slot] }
-          : d
+        d.id === id ? { ...d, availability: [...d.availability, slot] } : d
       )
     );
   };
@@ -82,8 +138,8 @@ export default function ClinicDashboard() {
   /* ---------------- UI ---------------- */
 
   return (
-    <div className="min-h-screen bg-gray-50 flex mt-10 top-10 pt-10">
-      {/* SIDEBAR (STATIC) */}
+    <div className="min-h-screen bg-gray-50 flex mt-10 pt-10">
+      {/* SIDEBAR */}
       <aside className="hidden lg:flex w-64 flex-col bg-white border-r p-6">
         <div className="flex items-center gap-2 mb-10">
           <Stethoscope className="text-blue-600" />
@@ -91,15 +147,30 @@ export default function ClinicDashboard() {
         </div>
 
         <nav className="space-y-1">
-          <NavItem icon={LayoutDashboard} label="Dashboard" onClick={() => setActiveTab("dashboard")} active={activeTab === "dashboard"} />
-          <NavItem icon={Stethoscope} label="Doctors" onClick={() => setActiveTab("doctors")} active={activeTab === "doctors"} />
-          <NavItem icon={Calendar} label="Schedules" onClick={() => setActiveTab("availability")} active={activeTab === "availability"} />
+          <NavItem
+            icon={LayoutDashboard}
+            label="Dashboard"
+            onClick={() => setActiveTab("dashboard")}
+            active={activeTab === "dashboard"}
+          />
+          <NavItem
+            icon={Stethoscope}
+            label="Doctors"
+            onClick={() => setActiveTab("doctors")}
+            active={activeTab === "doctors"}
+          />
+          <NavItem
+            icon={Calendar}
+            label="Schedules"
+            onClick={() => setActiveTab("availability")}
+            active={activeTab === "availability"}
+          />
         </nav>
       </aside>
 
       {/* MAIN */}
       <div className="flex-1 flex flex-col">
-        {/* TOPBAR (NO FLOAT) */}
+        {/* TOPBAR */}
         <header className="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8">
           <h2 className="font-semibold capitalize">{activeTab}</h2>
 
@@ -108,11 +179,11 @@ export default function ClinicDashboard() {
               <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
               <input
                 placeholder="Search..."
-                className="pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="pl-9 pr-3 py-2 border rounded-lg text-sm"
               />
             </div>
 
-            <button className="p-2 rounded-lg border hover:bg-gray-100">
+            <button className="p-2 rounded-lg border">
               <Bell size={18} />
             </button>
           </div>
@@ -121,28 +192,71 @@ export default function ClinicDashboard() {
         {/* CONTENT */}
         <main className="p-4 lg:p-8 space-y-6">
           {/* HERO */}
-          <div className="relative h-36 lg:h-44 rounded-xl overflow-hidden">
+          <div className="relative h-36 rounded-xl overflow-hidden">
             <Image
               src="/images/clinic-dashboard.jpg"
               alt="clinic"
               fill
               className="object-cover"
             />
-            <div className="absolute inset-0 bg-black/50 flex items-center px-6">
-              <h2 className="text-white text-lg lg:text-2xl font-bold">
-                Manage your clinic efficiently
-              </h2>
-            </div>
           </div>
 
-          {/* STATS */}
+          {/* DASHBOARD */}
           {activeTab === "dashboard" && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Stat title="Doctors" value={doctors.length} icon={Stethoscope} />
-              <Stat title="Nurses" value={nurses.length} icon={Users} />
-              <Stat title="Appointments" value={12} icon={Calendar} />
-              <Stat title="Activity" value={5} icon={Activity} />
-            </div>
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <Stat title="Doctors" value={doctors.length} icon={Stethoscope} />
+                <Stat title="Nurses" value={nurses.length} icon={Users} />
+                <Stat
+                  title="Appointments"
+                  value={appointments.length}
+                  icon={Calendar}
+                />
+                <Stat title="Activity" value={5} icon={Activity} />
+              </div>
+
+              {/* APPOINTMENTS CRUD */}
+              <Section title="Appointments">
+                <div className="space-y-3">
+                  {appointments.map((a) => (
+                    <Card key={a._id}>
+                      <div className="flex justify-between">
+                        <div>
+                          <p className="font-semibold">{a.motif}</p>
+                          <p className="text-sm text-gray-500">
+                            {new Date(a.date).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-gray-400">{a.status}</p>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            className="btn-secondary"
+                            onClick={() => updateStatus(a._id, "confirmed")}
+                          >
+                            Confirm
+                          </button>
+
+                          <button
+                            className="btn-secondary"
+                            onClick={() => updateStatus(a._id, "cancelled")}
+                          >
+                            Cancel
+                          </button>
+
+                          <button
+                            className="btn-secondary"
+                            onClick={() => deleteAppointment(a._id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </Section>
+            </>
           )}
 
           {/* DOCTORS */}
@@ -151,8 +265,8 @@ export default function ClinicDashboard() {
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {doctors.map((d) => (
                   <Card key={d.id}>
-                    <input className="input" value={d.name} />
-                    <input className="input mt-2" value={d.specialty} />
+                    <input className="input" value={d.name} readOnly />
+                    <input className="input mt-2" value={d.specialty} readOnly />
 
                     <button
                       className="btn-secondary mt-2"
@@ -165,40 +279,20 @@ export default function ClinicDashboard() {
               </div>
             </Section>
           )}
-
-          {/* AVAILABILITY */}
-          {activeTab === "availability" && (
-            <Section title="Schedules">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[...doctors, ...nurses].map((p: Person) => (
-                  <Card key={p.id}>
-                    <h3 className="font-semibold">{p.name}</h3>
-                    {p.availability.map((a, i) => (
-                      <p key={i} className="text-sm flex gap-2 text-gray-500">
-                        <Clock size={14} /> {a.day} {a.start}-{a.end}
-                      </p>
-                    ))}
-                  </Card>
-                ))}
-              </div>
-            </Section>
-          )}
         </main>
       </div>
     </div>
   );
 }
 
-/* ---------------- UI ---------------- */
+/* ---------------- UI HELPERS ---------------- */
 
 function NavItem({ icon: Icon, label, onClick, active }: any) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition ${
-        active
-          ? "bg-blue-50 text-blue-600"
-          : "hover:bg-gray-100 text-gray-600"
+      className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg ${
+        active ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100"
       }`}
     >
       <Icon size={18} />
@@ -210,7 +304,7 @@ function NavItem({ icon: Icon, label, onClick, active }: any) {
 function Section({ title, children, action }: any) {
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between">
         <h2 className="text-lg font-semibold">{title}</h2>
         {action && (
           <button onClick={action.onClick} className="btn-primary">
@@ -224,19 +318,15 @@ function Section({ title, children, action }: any) {
 }
 
 function Card({ children }: any) {
-  return (
-    <div className="bg-white p-4 rounded-xl border shadow-sm space-y-2">
-      {children}
-    </div>
-  );
+  return <div className="bg-white p-4 border rounded-xl shadow-sm">{children}</div>;
 }
 
 function Stat({ title, value, icon: Icon }: any) {
   return (
-    <div className="bg-white p-4 rounded-xl border shadow-sm flex justify-between">
+    <div className="bg-white p-4 border rounded-xl flex justify-between">
       <div>
         <p className="text-xs text-gray-500">{title}</p>
-        <h3 className="font-bold text-lg">{value}</h3>
+        <h3 className="text-lg font-bold">{value}</h3>
       </div>
       <Icon className="text-blue-600" />
     </div>
@@ -247,12 +337,12 @@ function Stat({ title, value, icon: Icon }: any) {
 
 const styles = `
 .input {
-  @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none;
+  @apply w-full border rounded-lg px-3 py-2 text-sm;
 }
 .btn-primary {
-  @apply bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700;
+  @apply bg-blue-600 text-white px-4 py-2 rounded-lg;
 }
 .btn-secondary {
-  @apply border px-3 py-2 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-1;
+  @apply border px-3 py-2 rounded-lg text-sm;
 }
 `;

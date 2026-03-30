@@ -20,7 +20,7 @@ export default function AppointmentsPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12">
       <h1 className="text-3xl font-bold mb-8">Book Your Appointment Now </h1>
       <div className="w-full max-w-md">
-        <AppointmentForm clinicId={clinicId} />
+        <AppointmentForm  />
       </div>
     </div>
   );

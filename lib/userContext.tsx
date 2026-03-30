@@ -25,13 +25,11 @@ interface User {
 
 interface UserContextType {
   user: User | null;
-  accessToken: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
   register: (data: any) => Promise<any>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<User | null>;
-  refreshToken: () => Promise<string | null>;
   verifyOtp: any;
   requestCode: any;
   resendOtp: any;
@@ -52,14 +50,7 @@ export const useUser = () => {
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const saveToken = (token: string | null) => {
-    setAccessToken(token);
-    if (token) localStorage.setItem("accessToken", token);
-    else localStorage.removeItem("accessToken");
-  };
 
   /* ---------------- LOGIN ---------------- */
   const login = async (email: string, password: string): Promise<User> => {
@@ -71,9 +62,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("User not assigned to any clinic");
     }
 
-    setUser(user);
-    saveToken(accessToken);
+    if (accessToken) {
+      localStorage.setItem("accessToken", accessToken);
+    }
 
+    setUser(user);
     return user;
   };
 
@@ -88,27 +81,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     try {
       await api.post("auth/logout");
     } finally {
+      localStorage.removeItem("accessToken");
       setUser(null);
-      saveToken(null);
     }
   };
 
   /* ---------------- FETCH ME ---------------- */
   const fetchMe = async (): Promise<User | null> => {
     try {
-      let token = localStorage.getItem("accessToken");
-
-      // 🔥 try refresh if no token
-      if (!token) {
-        token = await refreshToken();
-        if (!token) {
-          setLoading(false);
-          return null;
-        }
-      }
-
-      saveToken(token);
-
       const res = await api.get("auth/me");
       const user = res.data.user;
 
@@ -118,28 +98,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       return user;
     } catch {
       setUser(null);
-      saveToken(null);
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------------- REFRESH ---------------- */
-  const refreshToken = async (): Promise<string | null> => {
-    try {
-      const res = await api.post("auth/refresh-token");
-      const token = res.data.accessToken;
-
-      saveToken(token);
-      return token;
-    } catch {
-      saveToken(null);
-      return null;
-    }
-  };
-
-  /* ---------------- OTHER ---------------- */
+  /* ---------------- OTP / AUTH ---------------- */
 
   const verifyOtp = async (email: string, code: string, context?: string) =>
     (await api.post("auth/verify-otp", { email, otpCode: code, context })).data;
@@ -156,6 +121,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     newPassword: string
   ) =>
     (await api.post("auth/reset-password", { email, code, newPassword })).data;
+
+  /* ---------------- PROFILE ---------------- */
 
   const updateProfile = async (formData: FormData) => {
     const res = await api.put("auth/update-profile", formData, {
@@ -180,8 +147,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteProfile = async () => {
     const res = await api.delete("auth/delete");
+    localStorage.removeItem("accessToken");
     setUser(null);
-    saveToken(null);
     return res.data;
   };
 
@@ -194,13 +161,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     <UserContext.Provider
       value={{
         user,
-        accessToken,
         loading,
         login,
         register,
         logout,
         fetchMe,
-        refreshToken,
         verifyOtp,
         requestCode,
         resendOtp,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -49,15 +49,14 @@ const resolveLogo = (logo?: string | null) => {
 
 /* ---------------- COMPONENT ---------------- */
 
-export default function Navbar({
-  clinicId,
-  advertisement,
-}: NavbarProps) {
+export default function Navbar({ clinicId, advertisement }: NavbarProps) {
   const pathname = usePathname();
   const params = useParams();
   const controls = useAnimation();
 
   const { user, logout } = useUser();
+
+  const isAdmin = user?.role === "admin";
 
   const [clinic, setClinic] = useState<ClinicData>({
     clinicId: "",
@@ -77,15 +76,50 @@ export default function Navbar({
     (typeof params?.clinicId === "string" ? params.clinicId : "") ||
     "";
 
-  /* ---------------- NAV ITEMS ---------------- */
+  /* ---------------- NAV ITEMS (ROLE BASED) ---------------- */
 
-  const navItems = [
-    { name: "Accueil", href: `/clinic/${clinic.clinicId}`, icon: Home },
-    { name: "Dashboard", href: `/clinic/${clinic.clinicId}/dashboard`, icon: GrDashboard },
-    { name: "Patients", href: `/clinic/${clinic.clinicId}/patients`, icon: Users },
-    { name: "Rendez-vous", href: `/clinic/${clinic.clinicId}/appointment`, icon: Calendar },
-    { name: "Contact", href: `/clinic/${clinic.clinicId}/contact`, icon: Mail },
-  ];
+  const navItems = useMemo(() => {
+    const base = [
+      {
+        name: "Accueil",
+        href: `/clinic/${clinic.clinicId}`,
+        icon: Home,
+      },
+    ];
+
+    const adminItems = [
+      {
+        name: "Dashboard",
+        href: `/clinic/${clinic.clinicId}/dashboard`,
+        icon: GrDashboard,
+      },
+ 
+    ];
+
+    const commonItems = [
+           {
+        name: "Patients",
+        href: `/clinic/${clinic.clinicId}/patients`,
+        icon: Users,
+      },
+      {
+        name: "Rendez-vous",
+        href: `/clinic/${clinic.clinicId}/appointment`,
+        icon: Calendar,
+      },
+      {
+        name: "Contact",
+        href: `/clinic/${clinic.clinicId}/contact`,
+        icon: Mail,
+      },
+    ];
+
+    return [
+      ...base,
+      ...(isAdmin ? adminItems : []),
+      ...commonItems,
+    ];
+  }, [clinic.clinicId, isAdmin]);
 
   /* ---------------- EFFECTS ---------------- */
 
@@ -113,7 +147,10 @@ export default function Navbar({
 
     const fetchClinic = async () => {
       try {
-        const res = await api.get(`/clinic/clinic-link/${resolvedClinicId}`);
+        const res = await api.get(
+          `/clinic/clinic-link/${resolvedClinicId}`
+        );
+
         if (!res?.data?.success) return;
 
         const data = res.data.data;
@@ -180,7 +217,10 @@ export default function Navbar({
       >
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-full">
           {/* LOGO */}
-          <Link href={`/clinic/${clinic.clinicId}`} className="flex items-center gap-3">
+          <Link
+            href={`/clinic/${clinic.clinicId}`}
+            className="flex items-center gap-3"
+          >
             <div className="relative w-10 h-10 rounded-full overflow-hidden border border-white/20">
               <Image
                 src={clinic.logo}
@@ -190,7 +230,9 @@ export default function Navbar({
                 unoptimized={clinic.logo.startsWith("data:image")}
               />
             </div>
-            <span className="text-white font-semibold">{clinic.name}</span>
+            <span className="text-white font-semibold">
+              {clinic.name}
+            </span>
           </Link>
 
           {/* DESKTOP */}
@@ -225,7 +267,9 @@ export default function Navbar({
                   <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm">
                     {user.username?.charAt(0)?.toUpperCase()}
                   </div>
-                  <span className="text-white text-sm">{user.username}</span>
+                  <span className="text-white text-sm">
+                    {user.username}
+                  </span>
                 </button>
 
                 <AnimatePresence>
@@ -236,7 +280,9 @@ export default function Navbar({
                       exit={{ opacity: 0 }}
                       className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg overflow-hidden"
                     >
-                      <Link href={`/clinic/${clinic.clinicId}/profile`}>
+                      <Link
+                        href={`/clinic/${clinic.clinicId}/profile`}
+                      >
                         <div className="px-4 py-3 hover:bg-gray-100 flex gap-2">
                           <UserCircle size={16} /> Profile
                         </div>
@@ -262,7 +308,10 @@ export default function Navbar({
           </div>
 
           {/* MOBILE BTN */}
-          <button onClick={() => setMobileOpen(true)} className="md:hidden text-white">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="md:hidden text-white"
+          >
             <Menu />
           </button>
         </div>
@@ -285,7 +334,10 @@ export default function Navbar({
             >
               <div className="flex justify-between mb-6">
                 <span className="text-white">Menu</span>
-                <X onClick={() => setMobileOpen(false)} className="text-white" />
+                <X
+                  onClick={() => setMobileOpen(false)}
+                  className="text-white"
+                />
               </div>
 
               {/* USER */}
@@ -295,8 +347,12 @@ export default function Navbar({
                     {user.username?.charAt(0)?.toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-white text-sm">{user.username}</p>
-                    <p className="text-gray-400 text-xs">{user.email}</p>
+                    <p className="text-white text-sm">
+                      {user.username}
+                    </p>
+                    <p className="text-gray-400 text-xs">
+                      {user.email}
+                    </p>
                   </div>
                 </div>
               )}

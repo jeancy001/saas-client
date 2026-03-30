@@ -25,6 +25,7 @@ export default function LoginClient() {
   const resolvedClinicId = useMemo((): string | null => {
     const clinicParam = params?.clinicId;
 
+
     if (typeof clinicParam === "string") return clinicParam;
     if (Array.isArray(clinicParam)) return clinicParam[0];
 
@@ -83,6 +84,7 @@ export default function LoginClient() {
         );
 
         const realId = res?.data?.data?._id;
+        console.log("ClinicId: ", realId)
 
         if (!res?.data?.success || !realId) {
           setError("Clinic not found");
