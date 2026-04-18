@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useParams } from "next/navigation";
+import { usePathname, useParams, useRouter } from "next/navigation";
 import {
   Home,
   Users,
@@ -12,7 +12,6 @@ import {
   Mail,
   Menu,
   X,
-  Phone,
   LogOut,
   UserCircle,
 } from "lucide-react";
@@ -22,104 +21,87 @@ import { useUser } from "@/lib/userContext";
 
 /* ---------------- TYPES ---------------- */
 
-interface NavbarProps {
-  clinicId?: string;
-  clinicName?: string;
+interface ClinicInfo {
+  name?: string;
+  email?: string;
+  phone?: string;
   logo?: string;
-  clinicEmail?: string;
-  clinicPhone?: string;
-  advertisement?: string;
 }
 
-interface ClinicData {
-  clinicId: string;
-  name: string;
-  logo: string;
-  email: string;
-  phone: string;
+interface NavbarProps {
+  clinicId?: string;
+  advertisement?: string;
+  clinic?: ClinicInfo; // optional SaaS injection
 }
 
 /* ---------------- HELPERS ---------------- */
 
-const resolveLogo = (logo?: string | null) => {
-  if (!logo || logo.trim() === "") return "/logo.png";
-  if (logo.startsWith("data:image")) return logo;
-  return logo;
-};
+const resolveLogo = (logo?: string | null) =>
+  logo && logo.trim() !== "" ? logo : "/logo.png";
 
 /* ---------------- COMPONENT ---------------- */
 
-export default function Navbar({ clinicId, advertisement }: NavbarProps) {
+export default function Navbar({
+  clinicId,
+  advertisement,
+  clinic: clinicProp,
+}: NavbarProps) {
   const pathname = usePathname();
   const params = useParams();
+  const router = useRouter();
   const controls = useAnimation();
-
-  const { user, logout } = useUser();
-
-  const isAdmin = user?.role === "admin";
-
-  const [clinic, setClinic] = useState<ClinicData>({
-    clinicId: "",
-    name: "Clinic",
-    logo: "/logo.png",
-    email: "",
-    phone: "",
-  });
-
-  const [mounted, setMounted] = useState(false);
-  const [showInfoBar, setShowInfoBar] = useState(true);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const { user, logout, loading } = useUser();
 
   const resolvedClinicId =
     clinicId ||
-    (typeof params?.clinicId === "string" ? params.clinicId : "") ||
-    "";
+    (typeof params?.clinicId === "string" ? params.clinicId : "");
 
-  /* ---------------- NAV ITEMS (ROLE BASED) ---------------- */
+  const isAdmin = user?.role === "admin";
+
+  /* ---------------- STATE (SAFE + OPTIONAL) ---------------- */
+
+  const [clinic, setClinic] = useState<ClinicInfo>({
+    name: clinicProp?.name || "Clinic",
+    logo: clinicProp?.logo || "/logo.png",
+    email: clinicProp?.email || "",
+    phone: clinicProp?.phone || "",
+  });
+
+  const [mounted, setMounted] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  /* ---------------- NAV ITEMS ---------------- */
 
   const navItems = useMemo(() => {
-    const base = [
-      {
-        name: "Accueil",
-        href: `/clinic/${clinic.clinicId}`,
-        icon: Home,
-      },
+    if (!resolvedClinicId) return [];
+
+    const items = [
+      { name: "Accueil", href: `/clinic/${resolvedClinicId}`, icon: Home },
+      ...(isAdmin
+        ? [
+            {
+              name: "Dashboard",
+              href: `/clinic/${resolvedClinicId}/dashboard`,
+              icon: GrDashboard,
+            },
+          ]
+        : []),
+      { name: "Patients", href: `/clinic/${resolvedClinicId}/patients`, icon: Users },
+      { name: "Rendez-vous", href: `/clinic/${resolvedClinicId}/appointment`, icon: Calendar },
+      { name: "Contact", href: `/clinic/${resolvedClinicId}/contact`, icon: Mail },
     ];
 
-    const adminItems = [
-      {
-        name: "Dashboard",
-        href: `/clinic/${clinic.clinicId}/dashboard`,
-        icon: GrDashboard,
-      },
- 
-    ];
-
-    const commonItems = [
-           {
-        name: "Patients",
-        href: `/clinic/${clinic.clinicId}/patients`,
-        icon: Users,
-      },
-      {
-        name: "Rendez-vous",
-        href: `/clinic/${clinic.clinicId}/appointment`,
-        icon: Calendar,
-      },
-      {
-        name: "Contact",
-        href: `/clinic/${clinic.clinicId}/contact`,
+    if (!user) {
+      items.push({
+        name: "Connexion",
+        href: `/clinic/${resolvedClinicId}/login`,
         icon: Mail,
-      },
-    ];
+      });
+    }
 
-    return [
-      ...base,
-      ...(isAdmin ? adminItems : []),
-      ...commonItems,
-    ];
-  }, [clinic.clinicId, isAdmin]);
+    return items;
+  }, [resolvedClinicId, isAdmin, user]);
 
   /* ---------------- EFFECTS ---------------- */
 
@@ -127,13 +109,11 @@ export default function Navbar({ clinicId, advertisement }: NavbarProps) {
     setMounted(true);
 
     const handleScroll = () => {
-      const y = window.scrollY;
-      setShowInfoBar(y < 80);
-
       controls.start({
-        height: y > 50 ? 64 : 80,
-        backgroundColor: "rgba(15,23,42,0.9)",
-        transition: { duration: 0.25 },
+        height: window.scrollY > 50 ? 64 : 78,
+        backgroundColor: "rgba(15,23,42,0.85)",
+        backdropFilter: "blur(10px)",
+        transition: { duration: 0.2 },
       });
     };
 
@@ -142,92 +122,59 @@ export default function Navbar({ clinicId, advertisement }: NavbarProps) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [controls]);
 
+  /* ---------------- FETCH CLINIC (OPTIONAL OVERRIDE) ---------------- */
+
   useEffect(() => {
     if (!resolvedClinicId) return;
 
     const fetchClinic = async () => {
       try {
-        const res = await api.get(
-          `/clinic/clinic-link/${resolvedClinicId}`
-        );
-
+        const res = await api.get(`/clinic/clinic-link/${resolvedClinicId}`);
         if (!res?.data?.success) return;
 
         const data = res.data.data;
 
         setClinic({
-          clinicId: data.clinicId || resolvedClinicId,
-          name: data.name || "Clinic",
-          logo: resolveLogo(data.logo),
-          email: data.email || "",
-          phone: data.phone || "",
+          name: clinicProp?.name || data.name || "Clinic",
+          logo: resolveLogo(clinicProp?.logo || data.logo),
+          email: clinicProp?.email || data.email || "",
+          phone: clinicProp?.phone || data.phone || "",
         });
-      } catch (error) {
-        console.error(error);
+      } catch (err) {
+        console.error(err);
       }
     };
 
     fetchClinic();
-  }, [resolvedClinicId]);
+  }, [resolvedClinicId, clinicProp]);
 
-  if (!mounted) return null;
+  if (!mounted || loading) return null;
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace(`/clinic/${resolvedClinicId}/login`);
+  };
 
   /* ---------------- UI ---------------- */
 
   return (
     <header className="fixed top-0 w-full z-50">
-      {/* INFO BAR */}
-      <AnimatePresence>
-        {showInfoBar && (
-          <motion.div
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -10, opacity: 0 }}
-            className="bg-slate-900 text-gray-200 text-xs border-b border-white/10"
-          >
-            <div className="max-w-7xl mx-auto px-4 py-2 flex justify-between items-center">
-              <div className="flex gap-4">
-                {clinic.email && (
-                  <span className="flex items-center gap-1">
-                    <Mail size={14} /> {clinic.email}
-                  </span>
-                )}
-                {clinic.phone && (
-                  <span className="flex items-center gap-1">
-                    <Phone size={14} /> {clinic.phone}
-                  </span>
-                )}
-              </div>
-
-              {advertisement && (
-                <span className="bg-blue-600 px-3 py-1 rounded-full text-white text-[11px]">
-                  {advertisement}
-                </span>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* NAVBAR */}
       <motion.nav
         animate={controls}
-        initial={{ height: 80 }}
-        className="bg-slate-900 border-b border-white/10"
+        initial={{ height: 78 }}
+        className="border-b border-white/10 bg-slate-900/80"
       >
-        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-full">
+        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
+
           {/* LOGO */}
-          <Link
-            href={`/clinic/${clinic.clinicId}`}
-            className="flex items-center gap-3"
-          >
-            <div className="relative w-10 h-10 rounded-full overflow-hidden border border-white/20">
+          <Link href={`/clinic/${resolvedClinicId}`} className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full overflow-hidden border border-white/20">
               <Image
-                src={clinic.logo}
-                alt=""
-                fill
+                src={resolveLogo(clinic.logo)}
+                alt="logo"
+                width={40}
+                height={40}
                 className="object-cover"
-                unoptimized={clinic.logo.startsWith("data:image")}
               />
             </div>
             <span className="text-white font-semibold">
@@ -235,20 +182,20 @@ export default function Navbar({ clinicId, advertisement }: NavbarProps) {
             </span>
           </Link>
 
-          {/* DESKTOP */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* DESKTOP NAV */}
+          <div className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const active = pathname === item.href;
 
               return (
                 <Link key={item.name} href={item.href}>
                   <div
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${
-                      isActive
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition
+                      ${active
                         ? "bg-blue-600 text-white"
-                        : "text-gray-300 hover:bg-white/10"
-                    }`}
+                        : "text-gray-300 hover:bg-white/10 hover:text-white"
+                      }`}
                   >
                     <Icon size={16} />
                     {item.name}
@@ -257,14 +204,14 @@ export default function Navbar({ clinicId, advertisement }: NavbarProps) {
               );
             })}
 
-            {/* AUTH */}
-            {user ? (
-              <div className="relative">
+            {/* USER */}
+            {user && (
+              <div className="relative ml-2">
                 <button
-                  onClick={() => setProfileOpen((p) => !p)}
-                  className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg"
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10"
                 >
-                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm">
+                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
                     {user.username?.charAt(0)?.toUpperCase()}
                   </div>
                   <span className="text-white text-sm">
@@ -274,40 +221,29 @@ export default function Navbar({ clinicId, advertisement }: NavbarProps) {
 
                 <AnimatePresence>
                   {profileOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg overflow-hidden"
-                    >
-                      <Link
-                        href={`/clinic/${clinic.clinicId}/profile`}
-                      >
-                        <div className="px-4 py-3 hover:bg-gray-100 flex gap-2">
-                          <UserCircle size={16} /> Profile
+                    <motion.div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl overflow-hidden">
+                      <Link href={`/clinic/${resolvedClinicId}/profile`}>
+                        <div className="px-4 py-3 hover:bg-gray-100 flex items-center gap-2 text-sm">
+                          <UserCircle size={16} />
+                          Profile
                         </div>
                       </Link>
 
                       <button
-                        onClick={logout}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-100 flex gap-2 text-red-500"
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-100 flex items-center gap-2 text-sm text-red-500"
                       >
-                        <LogOut size={16} /> Logout
+                        <LogOut size={16} />
+                        Logout
                       </button>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
-            ) : (
-              <Link href="/login">
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
-                  Login
-                </button>
-              </Link>
             )}
           </div>
 
-          {/* MOBILE BTN */}
+          {/* MOBILE */}
           <button
             onClick={() => setMobileOpen(true)}
             className="md:hidden text-white"
@@ -317,63 +253,41 @@ export default function Navbar({ clinicId, advertisement }: NavbarProps) {
         </div>
       </motion.nav>
 
-      {/* MOBILE */}
+      {/* MOBILE MENU */}
       <AnimatePresence>
         {mobileOpen && (
           <>
             <motion.div
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 bg-black/40"
+              className="fixed inset-0 bg-black/50"
             />
 
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              className="fixed right-0 top-0 h-full w-72 bg-slate-900 p-6 flex flex-col"
-            >
-              <div className="flex justify-between mb-6">
-                <span className="text-white">Menu</span>
-                <X
-                  onClick={() => setMobileOpen(false)}
-                  className="text-white"
-                />
+            <motion.div className="fixed right-0 top-0 h-full w-80 bg-slate-900 p-6 flex flex-col">
+              <div className="flex justify-between text-white mb-6">
+                <span>Menu</span>
+                <button onClick={() => setMobileOpen(false)}>
+                  <X />
+                </button>
               </div>
 
-              {/* USER */}
-              {user && (
-                <div className="flex items-center gap-3 mb-6 border-b border-white/10 pb-4">
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white">
-                    {user.username?.charAt(0)?.toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-white text-sm">
-                      {user.username}
-                    </p>
-                    <p className="text-gray-400 text-xs">
-                      {user.email}
-                    </p>
-                  </div>
-                </div>
-              )}
+              <div className="flex flex-col gap-2">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link key={item.name} href={item.href}>
+                      <div className="flex items-center gap-3 px-3 py-3 rounded-lg text-gray-200 hover:bg-white/10">
+                        <Icon size={18} />
+                        {item.name}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
 
-              {/* NAV */}
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link key={item.name} href={item.href}>
-                    <div className="flex items-center gap-3 text-gray-200 py-3">
-                      <Icon size={18} /> {item.name}
-                    </div>
-                  </Link>
-                );
-              })}
-
-              {/* LOGOUT */}
               {user && (
                 <button
-                  onClick={logout}
-                  className="mt-auto border border-red-500 text-red-500 py-3 rounded-lg"
+                  onClick={handleLogout}
+                  className="mt-auto py-3 border border-red-500 text-red-400 rounded-lg"
                 >
                   Logout
                 </button>

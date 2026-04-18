@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter, useSearchParams, useParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock, Stethoscope } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -14,23 +14,21 @@ interface LoginForm {
   password: string;
 }
 
+interface ClinicData {
+  clinicId: string;
+  name: string;
+  logo: string;
+  email: string;
+  phone: string;
+}
+
 export default function LoginClient() {
   const { login } = useUser();
   const router = useRouter();
+
+  // ✅ GET clinicId FROM URL
   const params = useParams();
-  const searchParams = useSearchParams();
-
-  const redirectQuery = searchParams.get("redirect") ?? undefined;
-
-  const resolvedClinicId = useMemo((): string | null => {
-    const clinicParam = params?.clinicId;
-
-
-    if (typeof clinicParam === "string") return clinicParam;
-    if (Array.isArray(clinicParam)) return clinicParam[0];
-
-    return searchParams.get("clinicId");
-  }, [params, searchParams]);
+  const routeClinicId = params?.clinicId as string;
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -41,89 +39,106 @@ export default function LoginClient() {
     password: "",
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  const [clinic, setClinic] = useState<ClinicData>({
+    clinicId: "",
+    name: "Clinic",
+    logo: "/logo.png",
+    email: "",
+    phone: "",
+  });
 
+  const basePath = routeClinicId || clinic.clinicId || "";
+
+  /* ---------------- FETCH CLINIC ---------------- */
+  useEffect(() => {
+    if (!routeClinicId) return;
+
+    const fetchClinic = async () => {
+      try {
+        const res = await api.get(`/clinic/clinic-link/${routeClinicId}`);
+
+        if (!res?.data?.success) return;
+
+        const data = res.data.data;
+
+        setClinic({
+          clinicId: data.clinicId || routeClinicId,
+          name: data.name || "Clinic",
+          logo: data.logo || "/logo.png",
+          email: data.email || "",
+          phone: data.phone || "",
+        });
+      } catch (error) {
+        console.error(error);
+        setError("Invalid clinic link");
+      }
+    };
+
+    fetchClinic();
+  }, [routeClinicId]);
+
+  /* ---------------- FORM ---------------- */
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({
       ...prev,
-      [name]: value,
+      [e.target.name]: e.target.value,
     }));
   };
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get("/clinic/clinic-link");
-        console.log("Clinic list:", res?.data);
-      } catch {}
-    })();
-  }, []);
-
+  /* ---------------- SUBMIT ---------------- */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      const user = await login(form.email, form.password);
+      const res = await login(form.email, form.password);
 
-      let clinicId: string =
-        user?.clinicId ||
-        resolvedClinicId ||
-        localStorage.getItem("clinicId") ||
-        "";
+      const user = res?.user;
+      const accessToken = res?.accessToken;
+      const refreshToken = res?.refreshToken;
+
+      const clinicId = user?.clinicId || routeClinicId;
 
       if (!clinicId) {
-        setError("No clinic assigned");
+        setError("Clinic not assigned to this account");
         return;
       }
 
-      if (clinicId.length < 20) {
-        const res = await api.get(
-          `/clinic/clinic-link/${encodeURIComponent(clinicId)}`
-        );
-
-        const realId = res?.data?.data?._id;
-        console.log("ClinicId: ", realId)
-
-        if (!res?.data?.success || !realId) {
-          setError("Clinic not found");
-          return;
-        }
-
-        clinicId = realId;
-      }
-
+      localStorage.setItem("token", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
       localStorage.setItem("clinicId", clinicId);
 
-      const target =
-        redirectQuery ?? `/clinic/${clinicId}/dashboard`;
+      const clinicBasePath = `/clinic/${clinicId}`;
 
-      router.push(target);
+      const redirect =
+        user?.role === "admin"
+          ? `${clinicBasePath}/dashboard`
+          : clinicBasePath;
+
+      router.replace(redirect);
     } catch (err: any) {
-      setError(err?.message || "Login failed");
+      setError(err?.response?.data?.message || "Authentication failed");
     } finally {
       setLoading(false);
     }
   };
 
+  /* ---------------- UI ---------------- */
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-gray-50">
+
       {/* LEFT */}
       <div className="hidden md:flex flex-col justify-between bg-blue-600 text-white p-10">
         <div>
           <div className="flex items-center gap-2 text-xl font-semibold">
             <Stethoscope size={22} />
-            ClinicCare
+            {clinic.name}
           </div>
 
           <h2 className="mt-10 text-3xl font-bold">
             Secure access to dashboard
           </h2>
-
-          <p className="mt-4 text-blue-100 text-sm max-w-sm">
-            Manage patients and appointments efficiently.
-          </p>
         </div>
 
         <div className="relative w-full h-64 mt-10">
@@ -138,11 +153,8 @@ export default function LoginClient() {
 
       {/* RIGHT */}
       <div className="flex items-center justify-center px-6 py-10">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white shadow-xl rounded-2xl p-8"
-        >
+        <motion.div className="w-full max-w-md bg-white shadow-xl rounded-2xl p-8">
+
           <h1 className="text-2xl font-bold text-center mb-6">
             Clinic Login
           </h1>
@@ -152,6 +164,7 @@ export default function LoginClient() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+
             <div className="relative">
               <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
               <input
@@ -186,24 +199,22 @@ export default function LoginClient() {
 
             <button
               disabled={loading}
-              className="w-full py-3 bg-blue-600 text-white rounded-xl"
+              className="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
             >
               {loading ? "Loading..." : "Login"}
             </button>
           </form>
 
+          {/* ✅ NAVIGATION FIXED */}
           <div className="mt-6 text-center text-sm">
             <Link
-              href={
-                resolvedClinicId
-                  ? `/register?clinicId=${resolvedClinicId}`
-                  : "/register"
-              }
+              href={basePath ? `/clinic/${basePath}/register` : "#"}
               className="text-blue-600"
             >
               Create account
             </Link>
           </div>
+
         </motion.div>
       </div>
     </div>

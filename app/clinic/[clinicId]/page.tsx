@@ -6,6 +6,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import AppointmentForm from "@/components/AppointementForm";
 import api from "@/lib/api";
+import Specialties from "@/components/Specialities";
 import {
   CalendarCheck,
   Phone,
@@ -16,15 +17,16 @@ import {
   Stethoscope,
   User,
 } from "lucide-react";
+import Features from "@/components/Features";
 
 /* ---------------- ANIMATION ---------------- */
 const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
+  hidden: { opacity: 0, y: 30 },
   visible: { opacity: 1, y: 0 },
 };
 
 const stagger = {
-  visible: { transition: { staggerChildren: 0.08 } },
+  visible: { transition: { staggerChildren: 0.1 } },
 };
 
 /* ---------------- HERO ---------------- */
@@ -38,18 +40,18 @@ const Hero = ({ name }: { name: string }) => {
   }, []);
 
   return (
-    <section className="relative h-[88vh] flex items-center justify-center text-white overflow-hidden">
+    <section className="relative h-[90vh] flex items-center justify-center text-white overflow-hidden">
       <AnimatePresence>
         <motion.div
           key={i}
-          initial={{ opacity: 0, scale: 1.06 }}
+          initial={{ opacity: 0, scale: 1.08 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.9 }}
+          transition={{ duration: 1 }}
           className="absolute inset-0"
         >
           <Image src={slides[i]} alt="" fill className="object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
         </motion.div>
       </AnimatePresence>
 
@@ -59,20 +61,26 @@ const Hero = ({ name }: { name: string }) => {
         animate="visible"
         className="relative z-10 text-center max-w-3xl px-6"
       >
-        <motion.h1 variants={fadeUp} className="text-4xl md:text-6xl font-bold tracking-tight">
+        <motion.h1 variants={fadeUp} className="text-4xl md:text-6xl font-bold">
           {name}
         </motion.h1>
 
         <motion.p variants={fadeUp} className="mt-5 text-gray-200 text-lg">
-          Modern healthcare experience built around precision, care, and trust.
+          Modern healthcare experience built on trust, precision, and care.
         </motion.p>
 
         <motion.div variants={fadeUp} className="mt-10 flex gap-4 justify-center flex-wrap">
-          <a href="#appointment" className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 transition flex items-center gap-2 font-medium">
+          <a
+            href="#appointment"
+            className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 transition flex items-center gap-2 font-medium shadow-lg"
+          >
             <CalendarCheck size={18} /> Book Appointment
           </a>
 
-          <a href="tel:+243000000000" className="px-6 py-3 rounded-xl border border-white/60 hover:bg-white/10 transition flex items-center gap-2">
+          <a
+            href="tel:+243000000000"
+            className="px-6 py-3 rounded-xl border border-white/60 hover:bg-white/10 transition flex items-center gap-2"
+          >
             <Phone size={18} /> Call Clinic
           </a>
         </motion.div>
@@ -80,72 +88,13 @@ const Hero = ({ name }: { name: string }) => {
     </section>
   );
 };
-
+<div>
 /* ---------------- FEATURES ---------------- */
-const Features = () => {
-  const items = [
-    { icon: Stethoscope, title: "Specialists", desc: "Certified medical experts" },
-    { icon: Activity, title: "Diagnostics", desc: "Advanced equipment" },
-    { icon: HeartPulse, title: "Care", desc: "Patient-centered approach" },
-    { icon: ShieldCheck, title: "Safety", desc: "Strict hygiene protocols" },
-    { icon: Clock, title: "Speed", desc: "Fast consultations" },
-    { icon: User, title: "Experience", desc: "Smooth patient journey" },
-  ];
-
-  return (
-    <section className="py-24 bg-white">
-      <div className="max-w-6xl mx-auto px-6">
-        <h2 className="text-3xl font-bold text-center mb-14">Why Choose Us</h2>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {items.map((item, idx) => {
-            const Icon = item.icon;
-            return (
-              <motion.div
-                key={idx}
-                whileHover={{ y: -6 }}
-                className="rounded-2xl border bg-white shadow-sm p-6 hover:shadow-md transition"
-              >
-                <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
-                  <Icon size={20} />
-                </div>
-
-                <h3 className="font-semibold text-lg">{item.title}</h3>
-                <p className="text-gray-500 text-sm mt-1">{item.desc}</p>
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-};
-
+<Features/>
 /* ---------------- SPECIALTIES ---------------- */
-const Specialties = () => {
-  const data = ["Cardiology", "Pediatrics", "Dermatology", "General Medicine", "Diabetology", "Gastroenterology"];
 
-  return (
-    <section className="py-24 bg-gray-50">
-      <div className="max-w-6xl mx-auto px-6">
-        <h2 className="text-3xl font-bold text-center mb-14">Specialties</h2>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          {data.map((s, i) => (
-            <div key={i} className="relative h-52 rounded-2xl overflow-hidden group">
-              <Image src="/slides/nurse2.jpeg" alt="" fill className="object-cover group-hover:scale-105 transition duration-500" />
-              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition" />
-              <div className="absolute bottom-4 left-4 text-white font-semibold">
-                {s}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
-
+<Specialties />
+</div>
 /* ---------------- ABOUT ---------------- */
 const About = () => (
   <section className="py-24 bg-white">
@@ -154,17 +103,18 @@ const About = () => (
         <h2 className="text-3xl font-bold mb-6">About the Clinic</h2>
 
         <p className="text-gray-600 leading-relaxed">
-          We deliver modern healthcare solutions focused on accuracy, comfort, and patient trust using advanced medical systems.
+          We provide modern healthcare solutions focused on precision, comfort,
+          and trust using advanced medical systems and professional care teams.
         </p>
 
         <ul className="mt-6 space-y-2 text-gray-700">
-          <li>✔ Multidisciplinary team</li>
-          <li>✔ Advanced medical technology</li>
-          <li>✔ Personalized follow-up</li>
+          <li>✔ Multidisciplinary medical team</li>
+          <li>✔ Advanced diagnostic technology</li>
+          <li>✔ Personalized patient follow-up</li>
         </ul>
       </div>
 
-      <div className="relative h-96 rounded-3xl overflow-hidden shadow-lg">
+      <div className="relative h-96 rounded-3xl overflow-hidden shadow-xl">
         <Image src="/slides/nurse1.jpeg" alt="" fill className="object-cover" />
       </div>
     </div>
@@ -173,13 +123,13 @@ const About = () => (
 
 /* ---------------- CTA ---------------- */
 const CTA = () => (
-  <section className="py-20 bg-blue-600 text-white text-center">
-    <h2 className="text-3xl font-bold">Need fast consultation?</h2>
-    <p className="mt-3 text-white/80">Book an appointment in minutes</p>
+  <section className="py-20 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-center">
+    <h2 className="text-3xl font-bold">Need fast medical consultation?</h2>
+    <p className="mt-3 text-white/80">Book an appointment in just a few clicks</p>
 
     <a
       href="#appointment"
-      className="inline-flex mt-8 px-6 py-3 rounded-xl bg-white text-blue-600 font-semibold hover:bg-gray-100 transition items-center gap-2"
+      className="inline-flex mt-8 px-6 py-3 rounded-xl bg-white text-blue-600 font-semibold hover:bg-gray-100 transition items-center gap-2 shadow-lg"
     >
       <CalendarCheck size={18} /> Book Now
     </a>
@@ -233,9 +183,11 @@ export default function ClinicPage() {
       <CTA />
 
       <section id="appointment" className="py-24">
-        <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl p-10">
-          <h2 className="text-2xl font-bold text-center mb-8">Book Appointment</h2>
-          <AppointmentForm  />
+        <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-2xl p-10">
+          <h2 className="text-2xl font-bold text-center mb-8">
+            Book Appointment
+          </h2>
+          <AppointmentForm />
         </div>
       </section>
     </div>

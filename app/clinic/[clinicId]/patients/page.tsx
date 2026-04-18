@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Phone, Search, Stethoscope, X } from "lucide-react";
+import { Mail, Phone, Search, Stethoscope, X, Lock } from "lucide-react";
 import AppointmentForm from "@/components/AppointementForm";
 import api from "@/lib/api";
+import { useUser } from "@/lib/userContext";
+import { useRouter } from "next/navigation";
 
 interface Appointment {
   date: string;
@@ -20,103 +22,151 @@ interface Doctor {
   email: string;
   phone: string;
   available: boolean;
-  availableMedicines: string[];
   upcomingAppointments: Appointment[];
 }
 
-export default function PatientPage({ clinicId }: { clinicId: string }) {
+interface Clinic {
+  _id: string;
+  clinicId: string;
+  name: string;
+}
+
+export default function PatientPage() {
+  const { user } = useUser();
+  const router = useRouter();
+
+  const [clinicId, setClinicId] = useState<string | null>(null);
+  const [clinicsLoaded, setClinicsLoaded] = useState(false);
+
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("All");
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* FETCH DOCTORS */
+  /* ---------------- LOAD CLINIC ---------------- */
   useEffect(() => {
+    const loadClinics = async () => {
+      try {
+        setClinicsLoaded(false);
+
+        const res = await api.get("/clinic");
+        const clinics: Clinic[] = res.data?.data ?? [];
+
+        const firstClinic = clinics[0];
+
+        if (firstClinic?.clinicId) {
+          setClinicId(firstClinic.clinicId);
+        } else {
+          setError("No clinic available");
+        }
+      } catch (err: any) {
+        setError(err?.response?.data?.message || "Failed to load clinics");
+      } finally {
+        setClinicsLoaded(true);
+      }
+    };
+
+    loadClinics();
+  }, []);
+
+  /* ---------------- LOAD DOCTORS ---------------- */
+  useEffect(() => {
+    if (!clinicId) return;
+
     const fetchDoctors = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const res = await api.get("/clinic/doctor/", {
-          params: { clinicId },
-        });
+        const res = await api.get("/clinic/doctor/doctors");
 
         const mapped: Doctor[] = (res.data?.data || []).map((d: any) => ({
           id: d._id,
-          clinicId: d.clinicId,
+          clinicId: d.clinicId || clinicId,
           name: d.name,
           specialty: d.specialty,
           email: d.email,
           phone: d.phone,
-          available: d.available,
-          availableMedicines: d.availableMedicines ?? [],
-          upcomingAppointments: (d.upcomingAppointments ?? []).map(
-            (a: any) => ({
-              date: a.date,
-              patientName: a.patientName,
-              status: a.status,
-            })
-          ),
+          available: d.isActive,
+          upcomingAppointments: d.upcomingAppointments ?? [],
         }));
 
         setDoctors(mapped);
       } catch (err: any) {
-        console.error("Failed to fetch doctors", err);
-        setError(
-          err?.response?.data?.message || "Failed to load doctors"
-        );
+        setError(err?.response?.data?.message || "Failed to load doctors");
       } finally {
         setLoading(false);
       }
     };
 
-    if (clinicId) fetchDoctors();
+    fetchDoctors();
   }, [clinicId]);
 
-  /* SPECIALTIES */
+  /* ---------------- FILTERS ---------------- */
   const specialties = useMemo(() => {
     const all = doctors.map((d) => d.specialty);
     return ["All", ...Array.from(new Set(all))];
   }, [doctors]);
 
-  /* FILTER */
   const filteredDoctors = useMemo(() => {
     const search = searchTerm.toLowerCase();
 
     return doctors.filter((doc) => {
-      const matchesSearch =
-        doc.name.toLowerCase().includes(search) ||
-        doc.specialty.toLowerCase().includes(search);
-
-      const matchesSpecialty =
-        specialtyFilter === "All" || doc.specialty === specialtyFilter;
-
-      return matchesSearch && matchesSpecialty;
+      return (
+        (doc.name.toLowerCase().includes(search) ||
+          doc.specialty.toLowerCase().includes(search)) &&
+        (specialtyFilter === "All" || doc.specialty === specialtyFilter)
+      );
     });
   }, [doctors, searchTerm, specialtyFilter]);
 
-  /* LOADING */
-  if (loading) {
+  /* ---------------- AUTH BLOCK ---------------- */
+  if (!user) {
     return (
-      <div className="h-screen flex items-center justify-center text-gray-500">
-        Loading doctors...
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+        <div className="bg-white shadow-xl rounded-2xl p-8 max-w-md text-center border">
+          <Lock className="mx-auto text-blue-600 mb-4" size={40} />
+
+          <h2 className="text-xl font-semibold mb-2">
+            Authentication Required
+          </h2>
+
+          <p className="text-gray-500 text-sm mb-6">
+            Please sign in to view doctors and book appointments.
+          </p>
+
+          <button
+            disabled={!clinicId}
+            onClick={() => {
+              if (!clinicId) return;
+              router.push(`/clinic/${clinicId}/login`);
+            }}
+            className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            Sign In
+          </button>
+        </div>
       </div>
     );
   }
 
-  /* ERROR */
+  /* ---------------- GLOBAL LOADING ---------------- */
+  if (!clinicsLoaded || loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        Loading clinic & doctors...
+      </div>
+    );
+  }
+
+  /* ---------------- ERROR ---------------- */
   if (error) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center text-center px-4">
-        <p className="text-red-600 font-medium">{error}</p>
-        <button
-          onClick={() => location.reload()}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg"
-        >
-          Retry
-        </button>
+      <div className="h-screen flex items-center justify-center text-red-600">
+        {error}
       </div>
     );
   }
@@ -124,155 +174,93 @@ export default function PatientPage({ clinicId }: { clinicId: string }) {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-6">
 
-      {/* HEADER */}
       <div className="max-w-7xl mx-auto text-center mb-10">
-        <h1 className="text-3xl font-bold text-gray-800">Find a Doctor</h1>
-        <p className="text-gray-500 mt-2">
-          Book appointments with specialists
-        </p>
+        <h1 className="text-3xl font-bold">Find a Doctor</h1>
       </div>
 
-      {/* EMPTY STATE (NO DOCTORS IN SYSTEM) */}
-      {doctors.length === 0 && (
+      {doctors.length === 0 ? (
         <div className="text-center text-gray-500 mt-20">
-          <p className="text-lg font-medium">
-            No doctors available in this clinic
-          </p>
-          <p className="text-sm mt-2">
-            Please check back later or contact the clinic
-          </p>
+          No doctors available
         </div>
-      )}
-
-      {doctors.length > 0 && (
+      ) : (
         <>
           {/* SEARCH */}
-          <div className="max-w-4xl mx-auto flex flex-col md:flex-row gap-4 mb-10">
+          <div className="max-w-4xl mx-auto flex gap-4 mb-10">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 text-gray-400" size={18} />
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search doctor or specialty..."
-                className="w-full pl-9 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 py-2 border rounded-lg"
+                placeholder="Search doctor..."
               />
             </div>
 
             <select
               value={specialtyFilter}
               onChange={(e) => setSpecialtyFilter(e.target.value)}
-              className="border rounded-lg px-3 py-2"
+              className="border px-3 py-2 rounded-lg"
             >
-              {specialties.map((sp) => (
-                <option key={sp} value={sp}>
-                  {sp}
-                </option>
+              {specialties.map((s) => (
+                <option key={s}>{s}</option>
               ))}
             </select>
           </div>
 
-          {/* EMPTY FILTER RESULT */}
-          {filteredDoctors.length === 0 && (
-            <div className="text-center text-gray-500 mt-10">
-              No doctors match your search
-            </div>
-          )}
+          {/* DOCTORS */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredDoctors.map((doc) => (
+              <motion.div
+                key={doc.id}
+                whileHover={{ y: -5 }}
+                className="bg-white p-6 rounded-xl border"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <Stethoscope className="text-blue-600" />
+                  <div>
+                    <h3 className="font-semibold">{doc.name}</h3>
+                    <p className="text-sm text-gray-500">{doc.specialty}</p>
+                  </div>
+                </div>
 
-          {/* GRID */}
-          {filteredDoctors.length > 0 && (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
-              {filteredDoctors.map((doc) => (
-                <motion.div
-                  key={doc.id}
-                  whileHover={{ y: -5 }}
-                  className="bg-white border rounded-xl p-6 shadow-sm hover:shadow-lg transition"
+                <p className="text-sm flex gap-2">
+                  <Mail size={14} /> {doc.email}
+                </p>
+
+                <p className="text-sm flex gap-2 mb-4">
+                  <Phone size={14} /> {doc.phone}
+                </p>
+
+                <button
+                  onClick={() => setSelectedDoctor(doc)}
+                  className="w-full bg-blue-600 text-white py-2 rounded-lg"
                 >
-                  {/* HEADER */}
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Stethoscope size={20} className="text-blue-600" />
-                    </div>
-
-                    <div>
-                      <h3 className="font-semibold text-gray-800">
-                        {doc.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {doc.specialty}
-                      </p>
-                    </div>
-
-                    <span
-                      className={`ml-auto text-xs px-2 py-1 rounded-full ${
-                        doc.available
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {doc.available ? "Available" : "Busy"}
-                    </span>
-                  </div>
-
-                  {/* CONTACT */}
-                  <div className="text-sm text-gray-600 space-y-2 mb-4">
-                    <p className="flex items-center gap-2">
-                      <Mail size={15} /> {doc.email}
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <Phone size={15} /> {doc.phone}
-                    </p>
-                  </div>
-
-                  {/* ACTION */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setSelectedDoctor(doc)}
-                      className="flex-1 bg-blue-600 text-white text-sm py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      Book Appointment
-                    </button>
-
-                    <a
-                      href={`tel:${doc.phone}`}
-                      className="border px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100"
-                    >
-                      <Phone size={16} />
-                    </a>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
+                  Book Appointment
+                </button>
+              </motion.div>
+            ))}
+          </div>
         </>
       )}
 
       {/* MODAL */}
       <AnimatePresence>
         {selectedDoctor && (
-          <motion.div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white w-full max-w-lg rounded-xl shadow-xl p-6 relative"
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-            >
+          <motion.div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-xl w-full max-w-lg relative">
               <button
                 onClick={() => setSelectedDoctor(null)}
-                className="absolute right-4 top-4 text-gray-400"
+                className="absolute top-3 right-3"
               >
                 <X />
               </button>
 
-              <h2 className="text-xl font-semibold mb-4">
-                Book Appointment with {selectedDoctor.name}
+              <h2 className="text-lg font-semibold mb-4">
+                Book with {selectedDoctor.name}
               </h2>
 
               <AppointmentForm doctorId={selectedDoctor.id} />
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

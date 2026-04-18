@@ -99,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body
+      
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-gray-900`}
       > <UserProvider>
 

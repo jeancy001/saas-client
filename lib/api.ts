@@ -1,55 +1,48 @@
-import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from "axios"
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1/clinic",
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 30000,
-})
+});
 
+/* ---------------- REQUEST INTERCEPTOR ---------------- */
 api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  (config) => {
     if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token")
+      const token = localStorage.getItem("token");
+      const clinicId = localStorage.getItem("clinicId");
 
+      // ✅ attach token
       if (token) {
-        config.headers = config.headers ?? {}
-        config.headers.Authorization = `Bearer ${token}`
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      // optional: attach clinicId globally if backend expects it
+      if (clinicId) {
+        config.headers["x-clinic-id"] = clinicId;
       }
     }
 
-    return config
+    return config;
   },
-  (error: AxiosError) => Promise.reject(error)
-)
+  (error) => Promise.reject(error)
+);
 
+/* ---------------- RESPONSE INTERCEPTOR ---------------- */
 api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  (error: AxiosError<any>) => {
-    let message = "Unexpected API error"
+  (response) => response,
+  (error) => {
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "API Error";
 
-    if (error.response?.data) {
-      if (typeof error.response.data === "string") {
-        message = error.response.data
-      } else if (error.response.data.message) {
-        message = error.response.data.message
-      } else {
-        message = JSON.stringify(error.response.data)
-      }
-    } else if (error.message) {
-      message = error.message
-    }
+    console.error("API FULL ERROR:", error?.response?.data || error);
 
-    console.error("API Error:", message)
-
-    return Promise.reject({
-      message,
-      status: error.response?.status,
-      data: error.response?.data,
-      original: error,
-    })
+    return Promise.reject({ message, raw: error });
   }
-)
+);
 
-export default api
+export default api;

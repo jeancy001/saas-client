@@ -41,10 +41,6 @@ export default async function ClinicLayout({
 
       <Navbar
         advertisement="Follow us"
-        clinicEmail={clinic?.email ?? "clinic@gmail.com"}
-        clinicPhone={clinic?.phone ?? "+243 4848940000"}
-        logo={clinic?.logo ?? "/logo.png"}
-        clinicName={clinic?.name ?? "Clinic"}
         clinicId={clinicId}
       />
 

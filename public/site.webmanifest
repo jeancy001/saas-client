@@ -1,0 +1,10 @@
+{
+  "name": "Clinic SaaS",
+  "short_name": "Clinic",
+  "description": "Clinic management system for doctors, patients and appointments",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary"
+}

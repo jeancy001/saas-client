@@ -9,31 +9,54 @@ import {
 } from "react";
 import api from "./api";
 
+/* ---------------- USER MODEL ---------------- */
 interface User {
   _id: string;
   email: string;
-  clinicId: string;
   username?: string;
+  city?:string,
+  country?:string,
+  phone?: string;
+  firstname?: string;
+  lastname?: string;
+  clinicId?: string;
   role?: string;
   profileUrl?: string;
   isVerified?: boolean;
 }
 
+/* ---------------- CONTEXT ---------------- */
 interface UserContextType {
   user: User | null;
   loading: boolean;
-  login: any;
-  register: any;
-  logout: any;
-  fetchMe: any;
-  verifyOtp: any;
-  requestCode: any;
-  resendOtp: any;
-  resetPassword: any;
-  updateProfile: any;
-  updatePassword: any;
-  getProfiles: any;
-  deleteProfile: any;
+
+  accessToken: string | null;
+  refreshToken: string | null;
+  clinicId: string | null;
+
+  login: (email: string, password: string) => Promise<any>;
+  register: (data: any) => Promise<any>;
+  logout: () => Promise<void>;
+  fetchMe: () => Promise<User | null>;
+
+  verifyOtp: (email: string, code: string, context?: string) => Promise<any>;
+  requestCode: (email: string, context?: string) => Promise<any>;
+  resendOtp: (email: string, context?: string) => Promise<any>;
+
+  resetPassword: (
+    email: string,
+    code: string,
+    newPassword: string
+  ) => Promise<any>;
+
+  updateProfile: (formData: FormData) => Promise<any>;
+  updatePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<any>;
+
+  getProfiles: () => Promise<any>;
+  deleteProfile: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -44,22 +67,53 @@ export const useUser = () => {
   return ctx;
 };
 
+/* ---------------- PROVIDER ---------------- */
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [clinicId, setClinicId] = useState<string | null>(null);
+
+  /* ---------------- SESSION ---------------- */
+  const setSession = (access?: string | null, refresh?: string | null) => {
+    if (access !== undefined) {
+      setAccessToken(access);
+      access
+        ? localStorage.setItem("accessToken", access)
+        : localStorage.removeItem("accessToken");
+    }
+
+    if (refresh !== undefined) {
+      setRefreshToken(refresh);
+      refresh
+        ? localStorage.setItem("refreshToken", refresh)
+        : localStorage.removeItem("refreshToken");
+    }
+
+    if (access) {
+      api.defaults.headers.common.Authorization = `Bearer ${access}`;
+    } else {
+      delete api.defaults.headers.common.Authorization;
+    }
+  };
 
   /* ---------------- LOGIN ---------------- */
   const login = async (email: string, password: string) => {
     const res = await api.post("auth/login", { email, password });
 
-    const { accessToken, user } = res.data;
+    const { accessToken, refreshToken, user } = res.data;
 
-    if (accessToken) {
-      localStorage.setItem("accessToken", accessToken);
+    setSession(accessToken, refreshToken);
+    setUser(user);
+
+    if (user?.clinicId) {
+      setClinicId(user.clinicId);
+      localStorage.setItem("clinicId", user.clinicId);
     }
 
-    setUser(user);
-    return user;
+    return res.data;
   };
 
   /* ---------------- LOGOUT ---------------- */
@@ -67,38 +121,67 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     try {
       await api.post("auth/logout");
     } finally {
-      localStorage.removeItem("accessToken");
+      setSession(null, null);
       setUser(null);
+      setClinicId(null);
+
+      localStorage.removeItem("clinicId");
     }
   };
 
   /* ---------------- FETCH ME ---------------- */
-  const fetchMe = async () => {
+  const fetchMe = async (): Promise<User | null> => {
     try {
       const res = await api.get("auth/me");
-      setUser(res.data.user);
-      return res.data.user;
+
+      const userData = res.data.user;
+
+      setUser(userData);
+
+      if (userData?.clinicId) {
+        setClinicId(userData.clinicId);
+        localStorage.setItem("clinicId", userData.clinicId);
+      }
+
+      return userData;
     } catch {
       setUser(null);
       return null;
     }
   };
 
-  /* ---------------- INIT (IMPORTANT) ---------------- */
+  /* ---------------- INIT AUTH ---------------- */
   useEffect(() => {
     const initAuth = async () => {
-      try {
-        // 🔥 FIRST: try refresh using cookie
-        const res = await api.post("auth/refresh");
+      setLoading(true);
 
-        if (res.data.accessToken) {
-          localStorage.setItem("accessToken", res.data.accessToken);
-        }
-      } catch {
-        // ignore (no session)
+      const storedAccess = localStorage.getItem("accessToken");
+      const storedRefresh = localStorage.getItem("refreshToken");
+      const storedClinic = localStorage.getItem("clinicId");
+
+      if (storedAccess) {
+        setAccessToken(storedAccess);
+        api.defaults.headers.common.Authorization = `Bearer ${storedAccess}`;
       }
 
-      // 🔥 THEN: fetch user
+      if (storedRefresh) {
+        setRefreshToken(storedRefresh);
+      }
+
+      if (storedClinic) {
+        setClinicId(storedClinic);
+      }
+
+      try {
+        const res = await api.post("auth/refresh");
+
+        const { accessToken, refreshToken } = res.data;
+
+        setSession(accessToken, refreshToken);
+      } catch {
+        setSession(null, null);
+      }
+
       await fetchMe();
 
       setLoading(false);
@@ -108,7 +191,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   /* ---------------- OTHER METHODS ---------------- */
-
   const register = (data: any) => api.post("auth/register", data);
 
   const verifyOtp = (email: string, code: string, context?: string) =>
@@ -119,8 +201,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const resendOtp = requestCode;
 
-  const resetPassword = (email: string, code: string, newPassword: string) =>
-    api.post("auth/reset-password", { email, code, newPassword });
+  const resetPassword = (
+    email: string,
+    code: string,
+    newPassword: string
+  ) => api.post("auth/reset-password", { email, code, newPassword });
 
   const updateProfile = async (formData: FormData) => {
     const res = await api.put("auth/update-profile", formData);
@@ -128,16 +213,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     return res.data;
   };
 
-  const updatePassword = (currentPassword: string, newPassword: string) =>
-    api.put("auth/update-password", { currentPassword, newPassword });
+  const updatePassword = (
+    currentPassword: string,
+    newPassword: string
+  ) => api.put("auth/update-password", { currentPassword, newPassword });
 
   const getProfiles = async () =>
     (await api.get("auth/profiles")).data.users;
 
   const deleteProfile = async () => {
     await api.delete("auth/delete");
-    localStorage.removeItem("accessToken");
+    setSession(null, null);
     setUser(null);
+    setClinicId(null);
   };
 
   return (
@@ -145,6 +233,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       value={{
         user,
         loading,
+        accessToken,
+        refreshToken,
+        clinicId,
         login,
         register,
         logout,

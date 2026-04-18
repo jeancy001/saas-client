@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
 import { useUser } from "@/lib/userContext";
 import api from "@/lib/api";
-
+import {
+  Phone,
+  Mail,
+  User,
+  CalendarDays,
+  FileText,
+  CreditCard,
+} from "lucide-react";
+import toast, {Toaster} from "react-hot-toast";
 interface FormState {
   motif: string;
   date: string;
@@ -14,20 +22,26 @@ interface FormState {
   phone: string;
 }
 
-export default function AppointmentForm({
-  doctorId,
-}: {
-  doctorId?: string;
-}) {
+
+export default function AppointmentForm({ doctorId }: { doctorId?: string }) {
   const router = useRouter();
   const params = useParams();
   const { user } = useUser();
 
-  const clinicId = params?.clinicId
-    ? String(params.clinicId)
-    : undefined;
+  const clinicId = useMemo(() => {
+    const raw =
+      params?.clinicId ||
+      params?.id ||
+      (Array.isArray(params?.slug) ? params.slug[0] : params?.slug);
+
+    return typeof raw === "string" ? raw.trim() : null;
+  }, [params]);
 
   const [loading, setLoading] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [paymentRef, setPaymentRef] = useState<string | null>(null);
+  const [paymentMode, setPaymentMode] = useState<"now" | "later">("later");
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -39,193 +53,236 @@ export default function AppointmentForm({
     phone: "",
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    setForm((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
   };
 
+  /* ---------------- VALIDATION ---------------- */
   const validate = () => {
-    if (!clinicId) return "Clinic not found";
-    if (!form.motif.trim()) return "Reason required";
-    if (!form.date) return "Date required";
+    if (!clinicId) return "Clinic ID missing";
 
-    const date = new Date(form.date);
-    if (isNaN(date.getTime())) return "Invalid date";
+    const phone = user?.phone || form.phone;
+    if (!phone?.trim()) return "Phone number is required";
 
-    if (date.getTime() < Date.now()) {
-      return "Date cannot be in the past";
-    }
-
-    if (!user) {
-      if (!form.name.trim()) return "Name required";
-      if (!form.email.trim()) return "Email required";
-      if (!/\S+@\S+\.\S+/.test(form.email)) return "Invalid email";
+    if (form.date && new Date(form.date).getTime() < Date.now()) {
+      return "Date must be in the future";
     }
 
     return "";
   };
 
-  const handleSubmit = async () => {
-    if (loading) return;
-
+  /* ---------------- PAYMENT ---------------- */
+  const handlePayment = async () => {
     const err = validate();
-    if (err) {
-      setError(err);
-      return;
+    if (err) return setError(err);
+
+    setPaying(true);
+    setError(null);
+
+    try {
+      const { data } = await api.post("/clinic/payments/initiate", {
+        clinicId,
+        userId: user?._id,
+        amount: 100,
+        phone: user?.phone || form.phone,
+        email: user?.email || form.email || null,
+      });
+
+      setPaymentRef(data.payment?.reference);
+      setSuccess("Payment completed successfully");
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "Payment failed");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  /* ---------------- BOOKING ---------------- */
+  const handleSubmit = async () => {
+    const err = validate();
+    if (err) return setError(err);
+
+    if (paymentMode === "now" && !paymentRef) {
+      return setError("Please complete payment first");
     }
 
     setLoading(true);
     setError(null);
-    setSuccess(null);
 
     try {
       const payload: any = {
-        motif: form.motif.trim(),
-        date: new Date(form.date).toISOString(),
+        clinicId,
+        motif: form.motif || "",
+        date: form.date ? new Date(form.date).toISOString() : null,
+        userId: user?._id,
+        paymentMode,
+        paymentReference: paymentMode === "now" ? paymentRef : null,
       };
 
-      // ✅ optional doctorId
-      if (doctorId) {
-        payload.doctorId = doctorId;
-      }
+      if (doctorId) payload.doctorId = doctorId;
 
       if (!user) {
         payload.guest = {
-          name: form.name.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim(),
+          name: form.name || "",
+          email: form.email || "",
+          phone: form.phone,
         };
       }
 
       await api.post(`/clinic/appointment/${clinicId}`, payload);
 
-      setSuccess("Appointment booked successfully");
-
-      setForm({
-        motif: "",
-        date: "",
-        name: "",
-        email: "",
-        phone: "",
-      });
-
       setTimeout(() => {
         router.push(`/clinic/${clinicId}/appointment`);
-      }, 800);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Booking failed");
+      toast.success(
+      paymentMode === "later"
+        ? "Appointment booked. Pay after visit."
+        : "Appointment booked successfully!"
+    );
+    
+      }, 900);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "Booking failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const getMinDate = () => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    return now.toISOString().slice(0, 16);
-  };
+  const inputClass =
+    "w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
   return (
     <motion.div
-      className="max-w-xl mx-auto bg-white shadow-lg rounded-2xl p-6 space-y-5 border"
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 25 }}
       animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-xl mx-auto bg-white shadow-2xl rounded-3xl p-6 sm:p-8 space-y-5 border"
     >
-      <h2 className="text-xl font-semibold text-gray-800">
-        Book Appointment
-      </h2>
+      {/* HEADER */}
+      <div className="text-center">
+        <h2 className="text-2xl font-bold">Book Appointment</h2>
+        <p className="text-gray-500 text-sm mt-1">
+          Choose payment option and schedule your visit
+        </p>
+      </div>
 
+      {/* ERRORS */}
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+        <div className="p-3 rounded-xl bg-red-50 text-red-600 text-sm">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="text-sm text-green-600 bg-green-50 p-3 rounded-lg">
+        <div className="p-3 rounded-xl bg-green-50 text-green-600 text-sm">
           {success}
         </div>
       )}
 
-      <input
-        name="motif"
-        placeholder="Reason for consultation"
-        value={form.motif}
-        onChange={handleChange}
-        className="input"
-      />
+      {/* PAYMENT MODE */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setPaymentMode("later")}
+          className={`py-3 rounded-xl border text-sm font-medium transition ${
+            paymentMode === "later"
+              ? "bg-green-50 border-green-400"
+              : "bg-white"
+          }`}
+        >
+          🏥 Pay Later
+        </button>
 
-      <input
-        type="datetime-local"
-        name="date"
-        value={form.date}
-        min={getMinDate()}
-        onChange={handleChange}
-        className="input"
-      />
+        <button
+          onClick={() => setPaymentMode("now")}
+          className={`py-3 rounded-xl border text-sm font-medium transition ${
+            paymentMode === "now"
+              ? "bg-blue-50 border-blue-400"
+              : "bg-white"
+          }`}
+        >
+          💳 Pay Now
+        </button>
+      </div>
 
+      {/* MOTIF */}
+      <div className="relative">
+        <FileText className="absolute left-3 top-3 text-gray-400" size={18} />
+        <input
+          name="motif"
+          placeholder="Reason (optional)"
+          value={form.motif}
+          onChange={handleChange}
+          className={`${inputClass} pl-10`}
+        />
+      </div>
+
+      {/* DATE */}
+      <div className="relative">
+        <CalendarDays className="absolute left-3 top-3 text-gray-400" size={18} />
+        <input
+          type="datetime-local"
+          name="date"
+          value={form.date}
+          onChange={handleChange}
+          className={`${inputClass} pl-10`}
+        />
+      </div>
+
+      {/* GUEST FIELDS */}
       {!user && (
-        <>
-          <input
-            name="name"
-            placeholder="Your Name"
-            value={form.name}
-            onChange={handleChange}
-            className="input"
-          />
+        <div className="space-y-3">
+          <div className="relative">
+            <User className="absolute left-3 top-3 text-gray-400" size={18} />
+            <input
+              name="name"
+              placeholder="Full name (optional)"
+              value={form.name}
+              onChange={handleChange}
+              className={`${inputClass} pl-10`}
+            />
+          </div>
 
-          <input
-            name="email"
-            placeholder="Your Email"
-            value={form.email}
-            onChange={handleChange}
-            className="input"
-          />
+          <div className="relative">
+            <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
+            <input
+              name="email"
+              placeholder="Email (optional)"
+              value={form.email}
+              onChange={handleChange}
+              className={`${inputClass} pl-10`}
+            />
+          </div>
+        </div>
+      )}
 
-          <input
-            name="phone"
-            placeholder="Phone (optional)"
-            value={form.phone}
-            onChange={handleChange}
-            className="input"
-          />
-        </>
+      {/* PHONE (REQUIRED) */}
+      <div className="relative">
+        <Phone className="absolute left-3 top-3 text-blue-500" size={18} />
+        <input
+          name="phone"
+          placeholder="Phone number (required)"
+          value={form.phone}
+          onChange={handleChange}
+          className={`${inputClass} pl-10 border-blue-200`}
+        />
+      </div>
+<Toaster position="top-right" />
+      {/* ACTIONS */}
+      {paymentMode === "now" && (
+        <button
+          onClick={handlePayment}
+          disabled={paying}
+          className="w-full bg-black text-white py-3 rounded-xl hover:bg-gray-900 transition"
+        >
+          {paying ? "Processing payment..." : "Pay Now"}
+        </button>
       )}
 
       <button
         onClick={handleSubmit}
-        disabled={loading || !clinicId}
-        className="btn-primary w-full"
+        disabled={loading}
+        className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition font-medium"
       >
-        {loading ? "Processing..." : "Book Appointment"}
+        {loading ? "Booking..." : "Confirm Appointment"}
       </button>
-
-      <style jsx>{`
-        .input {
-          width: 100%;
-          padding: 12px;
-          border-radius: 10px;
-          border: 1px solid #e5e7eb;
-        }
-        .input:focus {
-          outline: none;
-          border-color: #2563eb;
-        }
-        .btn-primary {
-          background: #2563eb;
-          color: white;
-          padding: 12px;
-          border-radius: 10px;
-          font-weight: 500;
-        }
-        .btn-primary:disabled {
-          opacity: 0.7;
-        }
-      `}</style>
     </motion.div>
   );
 }
