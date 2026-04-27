@@ -23,6 +23,7 @@ interface User {
   role?: string;
   profileUrl?: string;
   isVerified?: boolean;
+  createdAt?: string;
 }
 
 /* ---------------- CONTEXT ---------------- */
