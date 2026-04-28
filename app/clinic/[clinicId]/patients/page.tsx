@@ -2,11 +2,26 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Phone, Search, Stethoscope, X, Lock } from "lucide-react";
+import {
+  Mail,
+  Phone,
+  Search,
+  Stethoscope,
+  X,
+  Lock,
+  Video,
+} from "lucide-react";
+
 import AppointmentForm from "@/components/AppointementForm";
 import api from "@/lib/api";
 import { useUser } from "@/lib/userContext";
 import { useRouter } from "next/navigation";
+import VideoCall from "@/components/Videocall";
+
+
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
+/* -------------------------------------------------------------------------- */
 
 interface Appointment {
   date: string;
@@ -31,6 +46,10 @@ interface Clinic {
   name: string;
 }
 
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                 */
+/* -------------------------------------------------------------------------- */
+
 export default function PatientPage() {
   const { user } = useUser();
   const router = useRouter();
@@ -41,7 +60,9 @@ export default function PatientPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("All");
+
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [videoDoctor, setVideoDoctor] = useState<Doctor | null>(null); // ✅ VIDEO STATE
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +106,7 @@ export default function PatientPage() {
 
         const mapped: Doctor[] = (res.data?.data || []).map((d: any) => ({
           id: d._id,
-          clinicId: d.clinicId || clinicId,
+          clinicId,
           name: d.name,
           specialty: d.specialty,
           email: d.email,
@@ -114,13 +135,12 @@ export default function PatientPage() {
   const filteredDoctors = useMemo(() => {
     const search = searchTerm.toLowerCase();
 
-    return doctors.filter((doc) => {
-      return (
+    return doctors.filter(
+      (doc) =>
         (doc.name.toLowerCase().includes(search) ||
           doc.specialty.toLowerCase().includes(search)) &&
         (specialtyFilter === "All" || doc.specialty === specialtyFilter)
-      );
-    });
+    );
   }, [doctors, searchTerm, specialtyFilter]);
 
   /* ---------------- AUTH BLOCK ---------------- */
@@ -139,12 +159,8 @@ export default function PatientPage() {
           </p>
 
           <button
-            disabled={!clinicId}
-            onClick={() => {
-              if (!clinicId) return;
-              router.push(`/clinic/${clinicId}/login`);
-            }}
-            className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+            onClick={() => clinicId && router.push(`/clinic/${clinicId}/login`)}
+            className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition"
           >
             Sign In
           </button>
@@ -153,10 +169,10 @@ export default function PatientPage() {
     );
   }
 
-  /* ---------------- GLOBAL LOADING ---------------- */
+  /* ---------------- LOADING ---------------- */
   if (!clinicsLoaded || loading) {
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center text-gray-500">
         Loading clinic & doctors...
       </div>
     );
@@ -174,76 +190,79 @@ export default function PatientPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-6">
 
+      {/* HEADER */}
       <div className="max-w-7xl mx-auto text-center mb-10">
         <h1 className="text-3xl font-bold">Find a Doctor</h1>
       </div>
 
-      {doctors.length === 0 ? (
-        <div className="text-center text-gray-500 mt-20">
-          No doctors available
+      {/* SEARCH */}
+      <div className="max-w-4xl mx-auto flex gap-4 mb-10">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 py-2 border rounded-lg"
+            placeholder="Search doctor..."
+          />
         </div>
-      ) : (
-        <>
-          {/* SEARCH */}
-          <div className="max-w-4xl mx-auto flex gap-4 mb-10">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 py-2 border rounded-lg"
-                placeholder="Search doctor..."
-              />
+
+        <select
+          value={specialtyFilter}
+          onChange={(e) => setSpecialtyFilter(e.target.value)}
+          className="border px-3 py-2 rounded-lg"
+        >
+          {specialties.map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* DOCTORS */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {filteredDoctors.map((doc) => (
+          <motion.div
+            key={doc.id}
+            whileHover={{ y: -5 }}
+            className="bg-white p-6 rounded-xl border shadow-sm"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <Stethoscope className="text-blue-600" />
+              <div>
+                <h3 className="font-semibold">{doc.name}</h3>
+                <p className="text-sm text-gray-500">{doc.specialty}</p>
+              </div>
             </div>
 
-            <select
-              value={specialtyFilter}
-              onChange={(e) => setSpecialtyFilter(e.target.value)}
-              className="border px-3 py-2 rounded-lg"
-            >
-              {specialties.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </div>
+            <p className="text-sm flex gap-2">
+              <Mail size={14} /> {doc.email}
+            </p>
 
-          {/* DOCTORS */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredDoctors.map((doc) => (
-              <motion.div
-                key={doc.id}
-                whileHover={{ y: -5 }}
-                className="bg-white p-6 rounded-xl border"
+            <p className="text-sm flex gap-2 mb-4">
+              <Phone size={14} /> {doc.phone}
+            </p>
+
+            {/* ACTIONS */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelectedDoctor(doc)}
+                className="flex-1 bg-blue-600 text-white py-2 rounded-lg"
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <Stethoscope className="text-blue-600" />
-                  <div>
-                    <h3 className="font-semibold">{doc.name}</h3>
-                    <p className="text-sm text-gray-500">{doc.specialty}</p>
-                  </div>
-                </div>
+                Book
+              </button>
 
-                <p className="text-sm flex gap-2">
-                  <Mail size={14} /> {doc.email}
-                </p>
+              <button
+                onClick={() => setVideoDoctor(doc)}
+                className="bg-green-600 text-white px-3 rounded-lg hover:bg-green-700"
+              >
+                <Video size={18} />
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
 
-                <p className="text-sm flex gap-2 mb-4">
-                  <Phone size={14} /> {doc.phone}
-                </p>
-
-                <button
-                  onClick={() => setSelectedDoctor(doc)}
-                  className="w-full bg-blue-600 text-white py-2 rounded-lg"
-                >
-                  Book Appointment
-                </button>
-              </motion.div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* MODAL */}
+      {/* BOOKING MODAL */}
       <AnimatePresence>
         {selectedDoctor && (
           <motion.div className="fixed inset-0 bg-black/50 flex items-center justify-center">
@@ -261,6 +280,22 @@ export default function PatientPage() {
 
               <AppointmentForm doctorId={selectedDoctor.id} />
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* VIDEO CALL MODAL ✅ */}
+      <AnimatePresence>
+        {videoDoctor && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <VideoCall
+              doctorName={videoDoctor.name}
+              onClose={() => setVideoDoctor(null)}
+            />
           </motion.div>
         )}
       </AnimatePresence>
