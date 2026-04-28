@@ -292,10 +292,10 @@ export default function PatientPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <VideoCall
-              doctorName={videoDoctor.name}
-              onClose={() => setVideoDoctor(null)}
-            />
+        <VideoCall
+          roomId={`doctor-${videoDoctor.id}`}   // ✅ important fix               // optional (if your component uses it)
+          onClose={() => setVideoDoctor(null)}
+        />
           </motion.div>
         )}
       </AnimatePresence>
