@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
-const socket: Socket = io(process.env.SOCKET_API_URL || "http://localhost:5000");
+const socket: Socket = io("https://saas-server-bay.vercel.app");
 
 type Peer = {
   id: string;
