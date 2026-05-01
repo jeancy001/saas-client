@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
-const socket: Socket = io("https://saas-server-bay.vercel.app");
-
 type Peer = {
   id: string;
   name?: string;
@@ -19,40 +17,69 @@ export function useWebRTC(
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const socketRef = useRef<Socket | null>(null);
+
   const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
+
+  /* ---------------- INIT ---------------- */
+  useEffect(() => {
+    const socket = io("https://saas-server-bay.vercel.app", {
+      transports: ["websocket"],
+      withCredentials: true,
+    });
+
+    socketRef.current = socket;
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   /* ---------------- INIT MEDIA ---------------- */
   useEffect(() => {
+    if (!socketRef.current) return;
+
     const init = async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
 
-      setLocalStream(stream);
+        setLocalStream(stream);
 
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+
+        socketRef.current?.emit("join-room", {
+          roomId,
+          userId: socketRef.current.id,
+          name: userName,
+          isHost,
+        });
+      } catch (err) {
+        console.error("Media error:", err);
       }
-
-      socket.emit("join-room", {
-        roomId,
-        userId: socket.id,
-        name: userName,
-        isHost,
-      });
     };
 
     init();
-  }, [roomId]);
+  }, [roomId, userName, isHost]);
 
-  /* ---------------- SOCKET ---------------- */
+  /* ---------------- SOCKET EVENTS ---------------- */
   useEffect(() => {
-    if (!localStream) return;
+    const socket = socketRef.current;
+
+    if (!socket || !localStream) return;
 
     const createPeer = (userId: string) => {
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        iceServers: [
+          {
+            urls: "stun:stun.l.google.com:19302",
+          },
+        ],
       });
 
       localStream.getTracks().forEach((track) => {
@@ -72,21 +99,23 @@ export function useWebRTC(
         const stream = event.streams[0];
 
         setPeers((prev) => {
-          const filtered = prev.filter((p) => p.id !== userId);
+          const exists = prev.find((p) => p.id === userId);
+
+          if (exists) return prev;
 
           return [
-            ...filtered,
+            ...prev,
             {
               id: userId,
               stream,
               name: "Participant",
-              isHost: false,
             },
           ];
         });
       };
 
       peerConnections.current[userId] = pc;
+
       return pc;
     };
 
@@ -95,6 +124,7 @@ export function useWebRTC(
       const pc = createPeer(userId);
 
       const offer = await pc.createOffer();
+
       await pc.setLocalDescription(offer);
 
       socket.emit("offer", {
@@ -107,9 +137,12 @@ export function useWebRTC(
     socket.on("offer", async ({ sdp, caller }) => {
       const pc = createPeer(caller);
 
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      await pc.setRemoteDescription(
+        new RTCSessionDescription(sdp)
+      );
 
       const answer = await pc.createAnswer();
+
       await pc.setLocalDescription(answer);
 
       socket.emit("answer", {
@@ -121,28 +154,42 @@ export function useWebRTC(
     /* ---------------- ANSWER ---------------- */
     socket.on("answer", async ({ sdp, caller }) => {
       const pc = peerConnections.current[caller];
+
       if (pc) {
-        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        await pc.setRemoteDescription(
+          new RTCSessionDescription(sdp)
+        );
       }
     });
 
     /* ---------------- ICE ---------------- */
-    socket.on("ice-candidate", async ({ candidate, caller }) => {
-      const pc = peerConnections.current[caller];
-      if (pc && candidate) {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    socket.on(
+      "ice-candidate",
+      async ({ candidate, caller }) => {
+        const pc = peerConnections.current[caller];
+
+        if (pc && candidate) {
+          await pc.addIceCandidate(
+            new RTCIceCandidate(candidate)
+          );
+        }
       }
-    });
+    );
 
     return () => {
       socket.off("user-joined");
       socket.off("offer");
       socket.off("answer");
       socket.off("ice-candidate");
+
+      Object.values(peerConnections.current).forEach((pc) =>
+        pc.close()
+      );
     };
   }, [localStream]);
 
-  /* ---------------- MIC / VIDEO CONTROL ---------------- */
+  /* ---------------- CONTROLS ---------------- */
+
   const toggleMic = (enabled: boolean) => {
     localStream?.getAudioTracks().forEach((track) => {
       track.enabled = enabled;
